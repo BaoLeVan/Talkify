@@ -1,0 +1,136 @@
+# ============================================================
+#  TALKIFY  Docker Compose (Development)
+#
+#  Chỉ chạy các service cần thiết cho giai đoạn đầu phát triển:
+#    app       Spring Boot application
+#    postgres  PostgreSQL 16   metadata (users, conversations)
+#    mongodb   MongoDB 7       message store
+#    redis     Redis 7         cache, presence, session
+#
+#  Kafka, MinIO, ELK, Jaeger, Prometheus sẽ thêm ở giai đoạn sau.
+#
+#  Lệnh:
+#    docker compose up -d              # khởi động tất cả
+#    docker compose up -d postgres mongodb redis   # chỉ infra (không build app)
+#    docker compose logs -f app        # xem log app
+#    docker compose down -v            # dừng và xóa volumes
+# ============================================================
+
+networks:
+  talkify-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+
+services:
+
+  # 
+  #  Spring Boot Application
+  # 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: talkify:latest
+    container_name: talkify-app
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+      # PostgreSQL
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/talkify_db
+      SPRING_DATASOURCE_USERNAME: talkify
+      SPRING_DATASOURCE_PASSWORD: talkify
+
+      # MongoDB
+      SPRING_DATA_MONGODB_URI: mongodb://talkify:talkify@mongodb:27017/talkify_db?authSource=admin
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: talkify
+
+      # Tắt Kafka auto-config nếu chưa dùng
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - talkify-network
+
+  # 
+  #  PostgreSQL 16
+  # 
+  postgres:
+    image: postgres:16-alpine
+    container_name: talkify-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: talkify_db
+      POSTGRES_USER: talkify
+      POSTGRES_PASSWORD: talkify
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - talkify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talkify -d talkify_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 
+  #  MongoDB 7
+  # 
+  mongodb:
+    image: mongo:7.0
+    container_name: talkify-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: talkify
+      MONGO_INITDB_ROOT_PASSWORD: talkify
+      MONGO_INITDB_DATABASE: talkify_db
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - talkify-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 
+  #  Redis 7
+  # 
+  redis:
+    image: redis:7.2-alpine
+    container_name: talkify-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass talkify --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - talkify-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "talkify", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
