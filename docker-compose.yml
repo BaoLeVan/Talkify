@@ -1,86 +1,62 @@
-version: '3.9'
-
 # ============================================================
-#  CHAT APPLICATION — Full Stack Docker Compose
-#  Services:
-#    - app          : Spring Boot Application
-#    - postgres     : PostgreSQL 16 (metadata)
-#    - mongodb      : MongoDB 7 (message store)
-#    - redis        : Redis 7 (cache, pub/sub, sessions)
-#    - kafka        : Apache Kafka KRaft (message broker)
-#    - minio        : MinIO S3-compatible (media storage)
-#    - prometheus   : Metrics scraping
-#    - grafana      : Dashboards & alerting
-#    - elasticsearch: Log storage (ELK)
-#    - kibana       : Log visualization
-#    - filebeat     : Log shipper (Docker → ES)
-#    - jaeger        : Distributed tracing
+#  TALKIFY  Docker Compose (Development)
+#
+#  Chỉ chạy các service cần thiết cho giai đoạn đầu phát triển:
+#    app       Spring Boot application
+#    postgres  PostgreSQL 16   metadata (users, conversations)
+#    mongodb   MongoDB 7       message store
+#    redis     Redis 7         cache, presence, session
+#
+#  Kafka, MinIO, ELK, Jaeger, Prometheus sẽ thêm ở giai đoạn sau.
+#
+#  Lệnh:
+#    docker compose up -d              # khởi động tất cả
+#    docker compose up -d postgres mongodb redis   # chỉ infra (không build app)
+#    docker compose logs -f app        # xem log app
+#    docker compose down -v            # dừng và xóa volumes
 # ============================================================
 
 networks:
-  chat-network:
+  talkify-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
 
 volumes:
   postgres_data:
   mongodb_data:
   redis_data:
-  kafka_data:
-  minio_data:
-  prometheus_data:
-  grafana_data:
-  elasticsearch_data:
 
 services:
 
-  # ─────────────────────────────────────────────────────────
+  # 
   #  Spring Boot Application
-  # ─────────────────────────────────────────────────────────
+  # 
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
-    image: chat-app:latest
-    container_name: talkify
-    restart: unless-stopped
+    image: talkify:latest
+    container_name: talkify-app
+    restart: on-failure
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "8080:8080"
     environment:
-      # App
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      SERVER_PORT: 8080
-      SNOWFLAKE_MACHINE_ID: ${SNOWFLAKE_MACHINE_ID:-1}
+      SPRING_PROFILES_ACTIVE: docker
+
       # PostgreSQL
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-chat_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-chatuser}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-chatpassword}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/talkify_db
+      SPRING_DATASOURCE_USERNAME: talkify
+      SPRING_DATASOURCE_PASSWORD: talkify
+
       # MongoDB
-      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_USER:-chatuser}:${MONGO_PASSWORD:-chatpassword}@mongodb:27017/${MONGO_DB:-chat_db}?authSource=admin
+      SPRING_DATA_MONGODB_URI: mongodb://talkify:talkify@mongodb:27017/talkify_db?authSource=admin
+
       # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-redispassword}
-      # Kafka
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      # MinIO
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
-      MINIO_BUCKET: ${MINIO_BUCKET:-chat-media}
-      # JWT
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-      JWT_ACCESS_EXPIRATION_MS: ${JWT_ACCESS_EXPIRATION_MS:-900000}
-      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-2592000000}
-      # Firebase (push notification)
-      FIREBASE_CREDENTIALS_PATH: /app/config/firebase-credentials.json
-      # JVM
-      JAVA_OPTS: "-Xms512m -Xmx1g -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom"
-    volumes:
-      - ./config/firebase-credentials.json:/app/config/firebase-credentials.json:ro
+      SPRING_DATA_REDIS_PASSWORD: talkify
+
+      # Tắt Kafka auto-config nếu chưa dùng
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,312 +64,73 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # kafka:
-      #   condition: service_healthy
     networks:
-      - chat-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      - talkify-network
 
-  # ─────────────────────────────────────────────────────────
+  # 
   #  PostgreSQL 16
-  # ─────────────────────────────────────────────────────────
+  # 
   postgres:
     image: postgres:16-alpine
-    container_name: chat-postgres
+    container_name: talkify-postgres
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-chat_db}
-      POSTGRES_USER: ${POSTGRES_USER:-chatuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chatpassword}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: talkify_db
+      POSTGRES_USER: talkify
+      POSTGRES_PASSWORD: talkify
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - chat-network
+      - talkify-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chatuser} -d ${POSTGRES_DB:-chat_db}"]
+      test: ["CMD-SHELL", "pg_isready -U talkify -d talkify_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ─────────────────────────────────────────────────────────
+  # 
   #  MongoDB 7
-  # ─────────────────────────────────────────────────────────
+  # 
   mongodb:
     image: mongo:7.0
-    container_name: chat-mongodb
+    container_name: talkify-mongodb
     restart: unless-stopped
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-rootpassword}
-      MONGO_INITDB_DATABASE: ${MONGO_DB:-chat_db}
+      MONGO_INITDB_ROOT_USERNAME: talkify
+      MONGO_INITDB_ROOT_PASSWORD: talkify
+      MONGO_INITDB_DATABASE: talkify_db
     volumes:
       - mongodb_data:/data/db
       - ./docker/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-    command: mongod --wiredTigerCacheSizeGB 1 --logpath /var/log/mongod.log
     networks:
-      - chat-network
+      - talkify-network
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ─────────────────────────────────────────────────────────
+  # 
   #  Redis 7
-  # ─────────────────────────────────────────────────────────
+  # 
   redis:
     image: redis:7.2-alpine
-    container_name: chat-redis
+    container_name: talkify-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-redispassword}
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --save 900 1
-      --save 300 10
-      --appendonly yes
-      --appendfsync everysec
+      - "6379:6379"
+    command: redis-server --requirepass talkify --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     networks:
-      - chat-network
+      - talkify-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispassword}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "talkify", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ─────────────────────────────────────────────────────────
-  #  Apache Kafka (KRaft mode — no ZooKeeper)
-  # ─────────────────────────────────────────────────────────
-  # kafka:
-  #   image: apache/kafka:3.7.0
-  #   container_name: chat-kafka
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${KAFKA_PORT:-9092}:9092"
-  #     - "9093:9093"
-  #   environment:
-  #     # KRaft configuration
-  #     KAFKA_NODE_ID: 1
-  #     KAFKA_PROCESS_ROLES: broker,controller
-  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-  #     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-  #     KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-  #     KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-  #     # Topic defaults
-  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
-  #     KAFKA_DEFAULT_REPLICATION_FACTOR: 1
-  #     KAFKA_NUM_PARTITIONS: 8
-  #     KAFKA_LOG_RETENTION_HOURS: 168        # 7 days
-  #     KAFKA_LOG_SEGMENT_BYTES: 1073741824   # 1GB
-  #     KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
-  #     # Performance
-  #     KAFKA_MESSAGE_MAX_BYTES: 10485760     # 10MB
-  #     KAFKA_REPLICA_FETCH_MAX_BYTES: 10485760
-  #     CLUSTER_ID: ${KAFKA_CLUSTER_ID:-MkU3OEVBNTcwNTJENDM2Qk}
-  #   volumes:
-  #     - kafka_data:/var/lib/kafka/data
-  #     - ./docker/kafka/create-topics.sh:/opt/kafka/create-topics.sh:ro
-  #   networks:
-  #     - chat-network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
-  #     interval: 15s
-  #     timeout: 10s
-  #     retries: 10
-  #     start_period: 30s
-
-  # # Kafka Topic Initializer (runs once)
-  # kafka-init:
-  #   image: apache/kafka:3.7.0
-  #   container_name: chat-kafka-init
-  #   restart: no
-  #   depends_on:
-  #     kafka:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./docker/kafka/create-topics.sh:/create-topics.sh:ro
-  #   command: ["bash", "/create-topics.sh"]
-  #   networks:
-  #     - chat-network
-
-  # # ─────────────────────────────────────────────────────────
-  # #  MinIO (S3-compatible Object Storage)
-  # # ─────────────────────────────────────────────────────────
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: chat-minio
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${MINIO_API_PORT:-9000}:9000"
-  #     - "${MINIO_CONSOLE_PORT:-9001}:9001"
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
-  #   command: server /data --console-address ":9001"
-  #   volumes:
-  #     - minio_data:/data
-  #   networks:
-  #     - chat-network
-  #   healthcheck:
-  #     test: ["CMD", "mc", "ready", "local"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-
-  # # MinIO Bucket Initializer
-  # minio-init:
-  #   image: minio/mc:latest
-  #   container_name: chat-minio-init
-  #   restart: no
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #   entrypoint: >
-  #     /bin/sh -c "
-  #       mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin123};
-  #       mc mb --ignore-existing local/${MINIO_BUCKET:-chat-media};
-  #       mc anonymous set download local/${MINIO_BUCKET:-chat-media}/public;
-  #       echo 'MinIO initialization complete'
-  #     "
-  #   networks:
-  #     - chat-network
-
-  # # ─────────────────────────────────────────────────────────
-  # #  Prometheus
-  # # ─────────────────────────────────────────────────────────
-  # prometheus:
-  #   image: prom/prometheus:v2.51.0
-  #   container_name: chat-prometheus
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${PROMETHEUS_PORT:-9090}:9090"
-  #   volumes:
-  #     - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  #     - ./docker/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
-  #     - prometheus_data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--storage.tsdb.retention.time=30d'
-  #     - '--web.enable-lifecycle'
-  #   networks:
-  #     - chat-network
-
-  # # ─────────────────────────────────────────────────────────
-  # #  Grafana
-  # # ─────────────────────────────────────────────────────────
-  # grafana:
-  #   image: grafana/grafana:10.4.0
-  #   container_name: chat-grafana
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${GRAFANA_PORT:-3000}:3000"
-  #   environment:
-  #     GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-  #     GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
-  #     GF_INSTALL_PLUGINS: grafana-clock-panel
-  #   volumes:
-  #     - grafana_data:/var/lib/grafana
-  #     - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-  #     - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
-  #   depends_on:
-  #     - prometheus
-  #   networks:
-  #     - chat-network
-
-  # # ─────────────────────────────────────────────────────────
-  # #  Elasticsearch 8 (Log Storage)
-  # # ─────────────────────────────────────────────────────────
-  # elasticsearch:
-  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
-  #   container_name: chat-elasticsearch
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${ELASTICSEARCH_PORT:-9200}:9200"
-  #   environment:
-  #     discovery.type: single-node
-  #     xpack.security.enabled: "false"
-  #     xpack.security.http.ssl.enabled: "false"
-  #     ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-  #     ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
-  #   volumes:
-  #     - elasticsearch_data:/usr/share/elasticsearch/data
-  #   networks:
-  #     - chat-network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\|\"status\":\"yellow\"'"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 30s
-
-  # # ─────────────────────────────────────────────────────────
-  # #  Kibana 8 (Log Visualization)
-  # # ─────────────────────────────────────────────────────────
-  # kibana:
-  #   image: docker.elastic.co/kibana/kibana:8.13.0
-  #   container_name: chat-kibana
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${KIBANA_PORT:-5601}:5601"
-  #   environment:
-  #     ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-  #   depends_on:
-  #     elasticsearch:
-  #       condition: service_healthy
-  #   networks:
-  #     - chat-network
-
-  # # ─────────────────────────────────────────────────────────
-  # #  Filebeat (Log Shipper: Docker stdout → Elasticsearch)
-  # # ─────────────────────────────────────────────────────────
-  # filebeat:
-  #   image: docker.elastic.co/beats/filebeat:8.13.0
-  #   container_name: chat-filebeat
-  #   restart: unless-stopped
-  #   user: root
-  #   volumes:
-  #     - ./docker/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   depends_on:
-  #     elasticsearch:
-  #       condition: service_healthy
-  #   networks:
-  #     - chat-network
-
-  # # ─────────────────────────────────────────────────────────
-  # #  Jaeger (Distributed Tracing)
-  # # ─────────────────────────────────────────────────────────
-  # jaeger:
-  #   image: jaegertracing/all-in-one:1.56
-  #   container_name: chat-jaeger
-  #   restart: unless-stopped
-  #   ports:
-  #     - "16686:16686"   # Jaeger UI
-  #     - "4317:4317"     # OTLP gRPC
-  #     - "4318:4318"     # OTLP HTTP
-  #   environment:
-  #     COLLECTOR_OTLP_ENABLED: "true"
-  #   networks:
-  #     - chat-network
