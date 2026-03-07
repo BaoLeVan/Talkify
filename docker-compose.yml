@@ -36,7 +36,7 @@ services:
       dockerfile: Dockerfile
     image: talkify:latest
     container_name: talkify-app
-    restart: on-failure
+    restart: always
     ports:
       - "8080:8080"
     environment:
@@ -106,7 +106,7 @@ services:
       MONGO_INITDB_DATABASE: talkify_db
     volumes:
       - mongodb_data:/data/db
-      - ./docker/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./docker/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
     networks:
       - talkify-network
     healthcheck:

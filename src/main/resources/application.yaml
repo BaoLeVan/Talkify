@@ -21,5 +21,10 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   mongodb:
-    uri: mongodb+srv://warcraftkun:CmeYUkN0DJHeVBmH@cluster0-baole.6bydbes.mongodb.net/?appName=Cluster0-BaoLe
+    uri: mongodb+srv://warcraftkun:CmeYUkN0DJHeVBmH@cluster0-baole.6bydbes.mongodb.net/talkify_db?appName=Cluster0-BaoLe
+    # explicit database name in case it cannot be inferred from the URI
+  # alternatively you can set spring.data.mongodb.database directly:
+  # data:
+  #   mongodb:
+  #     database: talkify_db
 
