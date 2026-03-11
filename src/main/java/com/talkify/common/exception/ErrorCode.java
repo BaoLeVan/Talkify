@@ -30,7 +30,8 @@ public enum ErrorCode {
     INVALID_TOKEN           (HttpStatus.UNAUTHORIZED,          "INVALID_TOKEN",           "Token is invalid or expired"),
     TOKEN_EXPIRED           (HttpStatus.UNAUTHORIZED,          "TOKEN_EXPIRED",           "Token has expired"),
     REFRESH_TOKEN_NOT_FOUND (HttpStatus.UNAUTHORIZED,          "REFRESH_TOKEN_NOT_FOUND", "Refresh token not found"),
-
+    EMAIL_ALREADY_EXISTS    (HttpStatus.CONFLICT,              "EMAIL_ALREADY_EXISTS",     "Email is already in use"),
+    
     // ── Messaging ─────────────────────────────────────────────────────
     MESSAGE_NOT_FOUND       (HttpStatus.NOT_FOUND,             "MESSAGE_NOT_FOUND",       "Message not found"),
     MESSAGE_ALREADY_REVOKED (HttpStatus.CONFLICT,              "MESSAGE_ALREADY_REVOKED", "Message has already been revoked"),
