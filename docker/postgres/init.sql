@@ -14,6 +14,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";          -- For LIKE/ILIKE fast search
 --  Soft-delete bằng status='DELETED' để giữ toàn vẹn FK lịch sử.
 --  verify_token KHÔNG lưu ở đây — dùng Redis TTL 24h: verify:{token} = userId
 -- ============================================================
+DROP TABLE IF EXISTS users CASCADE;
 CREATE TABLE IF NOT EXISTS users (
     id              BIGINT       PRIMARY KEY,                    -- Snowflake ID
     username        VARCHAR(50)  UNIQUE NOT NULL,
@@ -21,11 +22,11 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url      VARCHAR(500),
     phone_number    VARCHAR(20)  UNIQUE,
     email           VARCHAR(255) UNIQUE,
-    password_hash   VARCHAR(255) NOT NULL,                      -- Bcrypt hash
+    password        VARCHAR(255) NOT NULL,                      -- Bcrypt hash
     system_role     VARCHAR(10)  NOT NULL DEFAULT 'USER'
                     CHECK (system_role IN ('USER', 'ADMIN')),   -- Phân quyền hệ thống
     status          VARCHAR(10)  NOT NULL DEFAULT 'ACTIVE'
-                    CHECK (status IN ('ACTIVE', 'BANNED', 'DELETED')),
+                    CHECK (status IN ('ACTIVE', 'INACTIVE', 'BANNED', 'DELETED')),
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -242,12 +243,12 @@ CREATE TRIGGER trg_group_settings_updated_at
 -- ============================================================
 --  SAMPLE DATA (development only)
 -- ============================================================
-INSERT INTO users (id, username, display_name, phone_number, email, password_hash)
+INSERT INTO users (id, username, display_name, phone_number, email, password)
 SELECT 724288609792458752, 'alice', 'Duy Phước', '+84901000001', 'pndphuoc@gmail.com',
        '$2a$12$placeholder_bcrypt_hash_alice'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 724288609792458752);
 
-INSERT INTO users (id, username, display_name, phone_number, email, password_hash)
+INSERT INTO users (id, username, display_name, phone_number, email, password)
 SELECT 724288609792458753, 'bob', 'Bob Trần', '+84901000002', 'bob@example.com',
        '$2a$12$placeholder_bcrypt_hash_bob'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 724288609792458753);

@@ -44,6 +44,14 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    public static <T> ApiResponse<T> created(String customMessage, T data) {
+        return ApiResponse.<T>builder()
+                .code(HttpStatus.CREATED.value())
+                .message(customMessage)
+                .data(data)
+                .build();
+    }
+
     public static <T> ApiResponse<T> error(ErrorCode errorCode) {
         return ApiResponse.<T>builder()
                 .code(errorCode.getStatus().value())

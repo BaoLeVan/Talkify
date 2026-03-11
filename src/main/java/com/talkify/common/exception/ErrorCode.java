@@ -22,15 +22,18 @@ public enum ErrorCode {
     RATE_LIMIT_EXCEEDED     (HttpStatus.TOO_MANY_REQUESTS,     "RATE_LIMIT_EXCEEDED",     "Too many requests"),
 
     // ── Identity ──────────────────────────────────────────────────────
+    USER_MUST_NOT_BE_NULL   (HttpStatus.BAD_REQUEST,           "USER_MUST_NOT_BE_NULL",     "User cannot be null"),
     USER_NOT_FOUND          (HttpStatus.NOT_FOUND,             "USER_NOT_FOUND",          "User not found"),
     USER_ALREADY_EXISTS     (HttpStatus.CONFLICT,              "USER_ALREADY_EXISTS",     "Email or phone number already registered"),
     USER_BANNED             (HttpStatus.FORBIDDEN,             "USER_BANNED",             "Your account has been banned"),
     USER_NOT_VERIFIED       (HttpStatus.FORBIDDEN,             "USER_NOT_VERIFIED",       "Please verify your email first"),
+    USER_NAME_ALREADY_EXISTS (HttpStatus.CONFLICT,              "USER_NAME_ALREADY_EXISTS", "Username is already taken"),
     INVALID_CREDENTIALS     (HttpStatus.UNAUTHORIZED,          "INVALID_CREDENTIALS",     "Invalid email or password"),
     INVALID_TOKEN           (HttpStatus.UNAUTHORIZED,          "INVALID_TOKEN",           "Token is invalid or expired"),
     TOKEN_EXPIRED           (HttpStatus.UNAUTHORIZED,          "TOKEN_EXPIRED",           "Token has expired"),
     REFRESH_TOKEN_NOT_FOUND (HttpStatus.UNAUTHORIZED,          "REFRESH_TOKEN_NOT_FOUND", "Refresh token not found"),
-
+    EMAIL_ALREADY_EXISTS    (HttpStatus.CONFLICT,              "EMAIL_ALREADY_EXISTS",     "Email is already in use"),
+    
     // ── Messaging ─────────────────────────────────────────────────────
     MESSAGE_NOT_FOUND       (HttpStatus.NOT_FOUND,             "MESSAGE_NOT_FOUND",       "Message not found"),
     MESSAGE_ALREADY_REVOKED (HttpStatus.CONFLICT,              "MESSAGE_ALREADY_REVOKED", "Message has already been revoked"),
