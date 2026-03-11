@@ -7,7 +7,7 @@ public class Device {
     private Long id;
     private String deviceFingerprint;
     private String deviceToken;
-    private String platform;
+    private DevicePlatform platform;
     private String deviceName;
     private Instant lastActiveAt;
     private Instant createdAt;
@@ -18,8 +18,12 @@ public class Device {
             String deviceFingerprint, 
             String deviceName,
             String deviceToken, 
-            String platform
+            DevicePlatform platform
         ) {
+        if (deviceFingerprint == null || deviceFingerprint.isEmpty()) {
+            throw new IllegalArgumentException("Device fingerprint cannot be null or empty");
+        }
+        
         Device device = new Device();
         device.deviceFingerprint = deviceFingerprint;
         device.deviceToken = deviceToken;
@@ -44,6 +48,10 @@ public class Device {
 
     public String getDeviceName() {
         return deviceName;
+    }
+
+    public DevicePlatform getPlatform() {
+        return platform;
     }
 
     public String getDeviceToken() {

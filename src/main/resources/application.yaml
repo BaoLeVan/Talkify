@@ -28,3 +28,13 @@ spring:
   #   mongodb:
   #     database: talkify_db
 
+security:
+  jwt:
+    secret: ${JWT_SECRET_KEY}
+    access-token-ttl: 900 # 1 hour in milliseconds
+    refresh-token-ttl: 604800 # 7 days in milliseconds
+  cors:
+    allowed-origins: "*"
+    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+    allowed-headers: "*"
+

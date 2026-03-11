@@ -6,6 +6,9 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import com.talkify.identity.domain.model.UserRole;
+import com.talkify.identity.domain.model.UserStatus;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,25 +22,33 @@ import lombok.Setter;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class UserJpaEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-        @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false)
     private String username;
 
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
+    @Column(name = "phone_number", unique = true)
+    private String phoneNumber;
+
+    @Column(name = "password", nullable = false)
     private String password;
 
+    @Column(name = "display_name", nullable = false)
     private String displayName;
+
+    @Column(name = "avatar_url")
     private String avatarUrl;
 
+    @Column(name = "system_role", nullable = false)
     @Enumerated(EnumType.STRING)
-    private String role;
+    private UserRole role;
 
-    private boolean status;
+    @Enumerated(EnumType.STRING)
+    private UserStatus status;
+
     private Instant deletedAt;
 
     @CreatedDate
