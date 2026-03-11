@@ -21,11 +21,12 @@ import lombok.experimental.FieldDefaults;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
     int code;
+    String errorCode;
     String message;
     T data;
 
     @Builder.Default
-    private final Instant timestamp = Instant.now();
+    Instant timestamp = Instant.now();
 
     public static <T> ApiResponse<T> ok(T data) {
         return ApiResponse.<T>builder()
@@ -43,23 +44,18 @@ public class ApiResponse<T> {
                 .build();
     }
 
-    public static <T> ApiResponse<T> error(int code, String message) {
-        return ApiResponse.<T>builder()
-                .code(code)
-                .message(message)
-                .build();
-    }
-
     public static <T> ApiResponse<T> error(ErrorCode errorCode) {
         return ApiResponse.<T>builder()
                 .code(errorCode.getStatus().value())
+                .errorCode(errorCode.getCode())
                 .message(errorCode.getMessage())
                 .build();
     }
 
-        public static <T> ApiResponse<T> error(ErrorCode errorCode, String customMessage) {
+    public static <T> ApiResponse<T> error(ErrorCode errorCode, String customMessage) {
         return ApiResponse.<T>builder()
                 .code(errorCode.getStatus().value())
+                .errorCode(errorCode.getCode())
                 .message(customMessage != null ? customMessage : errorCode.getMessage())
                 .build();
     }
