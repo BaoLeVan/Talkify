@@ -38,7 +38,7 @@ public class JwtAdapter implements JwtPort{
                 .claim("role", role)
                 .claim("type", "access")
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(jwtProperties.getAccessTokenTtl())))
+                .expiration(Date.from(now.plusSeconds(jwtProperties.getAccessTokenTtl())))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -50,7 +50,7 @@ public class JwtAdapter implements JwtPort{
                 .subject(String.valueOf(userId.value()))
                 .claim("type", "refresh")
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(jwtProperties.getRefreshTokenTtl())))
+                .expiration(Date.from(now.plusSeconds(jwtProperties.getRefreshTokenTtl())))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -79,7 +79,7 @@ public class JwtAdapter implements JwtPort{
                 .parseSignedClaims(token);
     }
 
-
+    @Override
     public Claims extractAllClaims(String token) {
         return parseClaims(token).getPayload();
     }

@@ -38,7 +38,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwtAdapter.extractAllClaims(token);
 
-                if (!claims.get("type", String.class).equals("access")) {
+                if (!"access".equals(claims.get("type", String.class))) {
                     log.warn("Invalid token type: expected access token");
                     filterChain.doFilter(request, response);
                     return;
