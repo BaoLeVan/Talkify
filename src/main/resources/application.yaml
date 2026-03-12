@@ -27,6 +27,11 @@ spring:
   # data:
   #   mongodb:
   #     database: talkify_db
+  data:
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000
 
 security:
   jwt:
