@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 
 import com.talkify.config.security.JwtProperties;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.application.port.TokenClaims;
 import com.talkify.identity.domain.model.UserId;
+import com.talkify.identity.domain.model.UserStatus;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -24,21 +26,26 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class JwtAdapter implements JwtPort{
     private final JwtProperties jwtProperties;
+    private SecretKey signingKey;
 
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+        if (signingKey == null) {
+            signingKey = Keys.hmacShaKeyFor(jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+        }
+        return signingKey;
     }
 
     @Override
-    public String generateAccessToken(UserId userId, String email, String role) {
+    public String generateAccessToken(UserId userId, String email, String role, UserStatus status) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId.value()))
                 .claim("email", email)
                 .claim("role", role)
                 .claim("type", "access")
+                .claim("status", status.name())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(jwtProperties.getAccessTokenTtl())))
+                .expiration(Date.from(now.plusSeconds(jwtProperties.getAccessTokenTtl())))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -50,7 +57,7 @@ public class JwtAdapter implements JwtPort{
                 .subject(String.valueOf(userId.value()))
                 .claim("type", "refresh")
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(jwtProperties.getRefreshTokenTtl())))
+                .expiration(Date.from(now.plusSeconds(jwtProperties.getRefreshTokenTtl())))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -79,8 +86,15 @@ public class JwtAdapter implements JwtPort{
                 .parseSignedClaims(token);
     }
 
-
-    public Claims extractAllClaims(String token) {
-        return parseClaims(token).getPayload();
+    @Override
+    public TokenClaims extractAllClaims(String token) {
+        Claims payload = parseClaims(token).getPayload();
+        return new TokenClaims(
+                payload.getSubject(),
+                payload.get("type", String.class),
+                payload.get("email", String.class),
+                payload.get("role", String.class),
+                payload.get("status", String.class)
+        );
     }
 }
