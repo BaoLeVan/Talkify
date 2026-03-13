@@ -8,4 +8,17 @@ public interface CachePort {
     Optional<String> get(String key);
     void delete(String key);
     boolean exists(String key);
+
+    /**
+     * Atomic GET-then-DELETE (Redis GETDEL).
+     * Dùng cho OTP verify để tránh race condition TOCTOU.
+     */
+    Optional<String> getAndDelete(String key);
+
+    /**
+     * Atomic increment counter, đặt TTL nếu key chưa tồn tại.
+     * Dùng cho rate limiting / brute-force protection.
+     * @return giá trị sau khi increment
+     */
+    long increment(String key, Duration ttl);
 }

@@ -66,6 +66,23 @@ public class User {
         return user;
     }
 
+    /**
+     * Business method: kích hoạt tài khoản sau khi verify OTP.
+     * Chỉ INACTIVE mới được activate — đây là business invariant.
+     */
+    public void activate() {
+        if (this.status != UserStatus.INACTIVE) {
+            throw new IllegalStateException(
+                "Only INACTIVE accounts can be activated, current status: " + this.status
+            );
+        }
+        this.status = UserStatus.ACTIVE;
+    }
+
+    public void addDomainEvent(Object event) {
+        this.domainEvents.add(event);
+    }
+
     public void registerDevice(Device device) {
         boolean exists = devices.stream().anyMatch(d -> d.equals(device));
         if (!exists) {

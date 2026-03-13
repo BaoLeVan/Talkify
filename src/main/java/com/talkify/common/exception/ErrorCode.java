@@ -33,6 +33,12 @@ public enum ErrorCode {
     TOKEN_EXPIRED           (HttpStatus.UNAUTHORIZED,          "TOKEN_EXPIRED",           "Token has expired"),
     REFRESH_TOKEN_NOT_FOUND (HttpStatus.UNAUTHORIZED,          "REFRESH_TOKEN_NOT_FOUND", "Refresh token not found"),
     EMAIL_ALREADY_EXISTS    (HttpStatus.CONFLICT,              "EMAIL_ALREADY_EXISTS",     "Email is already in use"),
+    OTP_EXPIRED             (HttpStatus.BAD_REQUEST,           "OTP_EXPIRED",             "OTP has expired, please request a new one"),
+    OTP_INVALID             (HttpStatus.BAD_REQUEST,           "OTP_INVALID",             "Invalid OTP code"),
+    OTP_TOO_MANY_ATTEMPTS   (HttpStatus.TOO_MANY_REQUESTS,     "OTP_TOO_MANY_ATTEMPTS",   "Too many OTP attempts, please request a new one"),
+    OTP_MUST_NOT_BE_NULL       (HttpStatus.BAD_REQUEST,           "OTP_MUST_NOT_BE_NULL",     "OTP code cannot be null"),
+    OTP_ALREADY_USED           (HttpStatus.BAD_REQUEST,           "OTP_ALREADY_USED",           "OTP code has already been used"),    
+    PASSWORD_TOO_WEAK           (HttpStatus.BAD_REQUEST,           "PASSWORD_TOO_WEAK",         "Password must be at least 8 characters long and contain both letters and numbers"),
     
     // ── Messaging ─────────────────────────────────────────────────────
     MESSAGE_NOT_FOUND       (HttpStatus.NOT_FOUND,             "MESSAGE_NOT_FOUND",       "Message not found"),

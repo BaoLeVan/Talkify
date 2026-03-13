@@ -23,9 +23,13 @@ public class UserMapper {
                 .username(user.getName())
                 .password(user.getPassword().value())
                 .displayName(user.getDisplayName())
-                .role(UserRole.USER)
-                .status(UserStatus.INACTIVE)
+                .role(user.getRole() != null ? user.getRole() : UserRole.USER)
+                .status(user.getStatus() != null ? user.getStatus() : UserStatus.INACTIVE)
                 .phoneNumber(user.getPhoneNumber())
+                .avatarUrl(user.getAvatarUrl())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .deletedAt(user.getDeletedAt())
                 .build();
     }
 
