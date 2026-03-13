@@ -56,6 +56,14 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: talkify
 
+      # Mail (Gmail: dùng App Password, bật 2FA trước)
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: true
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: true
+
       # Tắt Kafka auto-config nếu chưa dùng
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     depends_on:

@@ -38,20 +38,21 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     public Optional<User> findByEmail(Email email) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByEmail'");
+        // Active-only: excludes soft-deleted users
+        return userJpaRepository.findActiveByEmail(email.value())
+                .map(userMapper::toDomain);
     }
 
     @Override
     public Optional<User> findByUsername(Username username) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByUsername'");
+        return userJpaRepository.findByUsername(username.value())
+                .map(userMapper::toDomain);
     }
 
     @Override
     public Optional<User> findById(Long id) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findById'");
+        return userJpaRepository.findActiveById(id)
+                .map(userMapper::toDomain);
     }
     
 }

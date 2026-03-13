@@ -52,6 +52,7 @@ public class UserJpaEntity {
     private Instant deletedAt;
 
     @CreatedDate
+    @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
     @LastModifiedDate

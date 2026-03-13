@@ -1,0 +1,36 @@
+# REST client environment
+@baseUrl = http://localhost:8080
+
+###
+
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+	"email": "phamngocduyphuoc3132001+1@gmail.com",
+	"username": "phuoc",
+	"password": "Pndphuoc313",
+	"confirmPassword": "Pndphuoc313",
+	"displayName": "Test User"
+}
+
+###
+
+POST {{baseUrl}}/api/v1/auth/verify-email
+Content-Type: application/json
+
+{
+	"email": "phamngocduyphuoc3132001+1@gmail.com",
+	"otp": "000000",
+	"purpose": "REGISTRATION"
+}
+
+###
+
+POST {{baseUrl}}/api/v1/auth/resend-otp
+Content-Type: application/json
+
+{
+	"email": "phamngocduyphuoc3132001+1@gmail.com",
+	"purpose": "REGISTRATION"
+}

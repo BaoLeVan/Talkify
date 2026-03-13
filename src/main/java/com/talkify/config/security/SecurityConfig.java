@@ -10,7 +10,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -34,7 +33,8 @@ public class SecurityConfig {
     private String frontendUrl;
 
     private static final String[] PUBLIC_POST = {
-        "/api/v1/auth/**",
+        "/api/v1/auth/register",
+        "/api/v1/auth/verify-email",
         // "/api/v1/users/register",
         // "/v3/api-docs/**",
         // "/swagger-ui/**",

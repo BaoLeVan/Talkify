@@ -27,6 +27,20 @@ spring:
   # data:
   #   mongodb:
   #     database: talkify_db
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000
+  
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
 
 security:
   jwt:
@@ -37,4 +51,3 @@ security:
     allowed-origins: "*"
     allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
     allowed-headers: "*"
-
