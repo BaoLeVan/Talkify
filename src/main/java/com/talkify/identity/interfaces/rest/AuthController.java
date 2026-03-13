@@ -28,15 +28,15 @@ public class AuthController {
         return ApiResponse.created("User registered successfully, please check your email for OTP", null);
     }
 
-    @PostMapping("/verify-email")
-    public ApiResponse<Void> verifyEmail(@Valid @RequestBody VerifyOtpCommand command) {
+    @PostMapping("/verify-otp") 
+    public ApiResponse<Void> verifyOtp(@Valid @RequestBody VerifyOtpCommand command) {
         otpHandler.handle(command);
-        return ApiResponse.ok(null);
+        return ApiResponse.ok("Verification successful", null);
     }
 
     @PostMapping("/resend-otp")
     public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpCommand command) {
         otpHandler.handle(command);
-        return ApiResponse.ok(null);
+        return ApiResponse.ok("OTP resent successfully, please check your email", null);
     }
 }

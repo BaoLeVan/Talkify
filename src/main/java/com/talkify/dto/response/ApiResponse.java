@@ -36,6 +36,14 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    public static <T> ApiResponse<T> ok(String customMessage, T data) {
+        return ApiResponse.<T>builder()
+                .code(HttpStatus.OK.value())
+                .message(customMessage)
+                .data(data)
+                .build();
+    }
+
     public static <T> ApiResponse<T> created(T data) {
         return ApiResponse.<T>builder()
                 .code(HttpStatus.CREATED.value())
