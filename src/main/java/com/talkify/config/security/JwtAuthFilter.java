@@ -32,10 +32,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final String AUTH_HEADER      = "Authorization";
     private static final String BEARER_PREFIX    = "Bearer ";
 
-    /**
-     * INACTIVE user được phép gọi các endpoint auth (đã là public, không cần JWT),
-     * nhưng nếu họ đính kèm JWT vào bất kỳ path nào ngoài prefix này → USER_NOT_VERIFIED.
-     */
     private static final String[] ALLOW_PATHS_FOR_INACTIVE_USER = {
             "/api/v1/auth/send-otp",
             "/api/v1/auth/verify-otp",
