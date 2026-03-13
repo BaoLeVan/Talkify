@@ -19,6 +19,7 @@ public enum ErrorCode {
     DUPLICATE_RESOURCE      (HttpStatus.CONFLICT,              "DUPLICATE_RESOURCE",      "Resource already exists"),
     ACCESS_DENIED           (HttpStatus.FORBIDDEN,             "ACCESS_DENIED",           "Access denied"),
     UNAUTHENTICATED         (HttpStatus.UNAUTHORIZED,          "UNAUTHENTICATED",         "Authentication required"),
+    UNAUTHORIZED            (HttpStatus.FORBIDDEN,             "UNAUTHORIZED",            "You do not have permission to perform this action"),
     RATE_LIMIT_EXCEEDED     (HttpStatus.TOO_MANY_REQUESTS,     "RATE_LIMIT_EXCEEDED",     "Too many requests"),
 
     // ── Identity ──────────────────────────────────────────────────────
