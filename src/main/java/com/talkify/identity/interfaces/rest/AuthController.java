@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.talkify.dto.response.ApiResponse;
 import com.talkify.identity.application.command.RegisterUserCommand;
+import com.talkify.identity.application.command.ResendOtpCommand;
 import com.talkify.identity.application.command.VerifyOtpCommand;
 import com.talkify.identity.application.handler.OtpHandler;
 import com.talkify.identity.application.handler.RegisterUserHandler;
@@ -29,6 +30,12 @@ public class AuthController {
 
     @PostMapping("/verify-email")
     public ApiResponse<Void> verifyEmail(@Valid @RequestBody VerifyOtpCommand command) {
+        otpHandler.handle(command);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/resend-otp")
+    public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpCommand command) {
         otpHandler.handle(command);
         return ApiResponse.ok(null);
     }

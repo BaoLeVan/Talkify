@@ -65,4 +65,9 @@ public class CacheAdapter implements CachePort {
         log.debug("Cache INCR | key={} count={}", key, result);
         return result;
     }
+
+    @Override
+    public Long getExpire(String key) {
+        return redisTemplate.getExpire(key);
+    }
 }

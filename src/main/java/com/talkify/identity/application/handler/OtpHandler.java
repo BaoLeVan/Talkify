@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
+import com.talkify.identity.application.command.ResendOtpCommand;
 import com.talkify.identity.application.command.SendOtpCommand;
 import com.talkify.identity.application.command.VerifyOtpCommand;
 import com.talkify.identity.application.port.CachePort;
@@ -14,7 +15,9 @@ import com.talkify.identity.application.port.EmailPort;
 import com.talkify.identity.application.port.OtpGeneratorPort;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpCacheKey;
+import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.User;
+import com.talkify.identity.domain.model.UserStatus;
 import com.talkify.identity.domain.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,7 @@ public class OtpHandler {
 
     private static final Duration OTP_TTL        = Duration.ofMinutes(5);
     private static final Duration ATTEMPT_TTL    = Duration.ofMinutes(10);
+    private static final Duration RESEND_COOLDOWN     = Duration.ofMinutes(1);
     private static final int      MAX_ATTEMPTS   = 5;
 
     private final UserRepository userRepository;
@@ -46,6 +50,32 @@ public class OtpHandler {
         cachePort.delete(OtpCacheKey.attemptOf(user.getId(), command.purpose()).value());
 
         log.info("OTP sent | userId={} purpose={}", user.getId().value(), command.purpose());
+
+        emailPort.sendVerificationEmail(user.getEmail().value(), user.getDisplayName(), code);
+    }
+
+    @Transactional(readOnly = true)
+    public void handle(ResendOtpCommand command) {
+        User user = userRepository.findByEmail(new Email(command.email()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (OtpPurpose.REGISTRATION.equals(command.purpose()) && user.getStatus() == UserStatus.ACTIVE) {
+            throw new AppException(ErrorCode.USER_ALREADY_ACTIVE);
+        }
+
+        String cacheKey = OtpCacheKey.of(user.getId(), command.purpose()).value();
+        Long ttl = cachePort.getExpire(cacheKey);
+        if (ttl != null && ttl >= OTP_TTL.toSeconds() - RESEND_COOLDOWN.toSeconds()) {
+            log.warn("OTP resend too frequent | userId={} purpose={} ttl={}s",
+                    user.getId().value(), command.purpose(), ttl);
+            throw new AppException(ErrorCode.OTP_RESEND_TOO_FREQUENT);
+        }
+
+        String code = otpGeneratorPort.generateCode();
+        cachePort.set(cacheKey, code, OTP_TTL);
+        cachePort.delete(OtpCacheKey.attemptOf(user.getId(), command.purpose()).value());
+
+        log.info("OTP re-sent | userId={} purpose={}", user.getId().value(), command.purpose());
 
         emailPort.sendVerificationEmail(user.getEmail().value(), user.getDisplayName(), code);
     }
