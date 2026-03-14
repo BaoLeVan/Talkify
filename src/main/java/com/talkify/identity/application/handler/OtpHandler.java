@@ -1,6 +1,7 @@
 package com.talkify.identity.application.handler;
 
 import java.time.Duration;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,20 +92,27 @@ public class OtpHandler {
 
         long attempts = cachePort.increment(attemptKey, ATTEMPT_TTL);
         if (attempts > MAX_ATTEMPTS) {
-            log.warn("OTP brute-force | userId={} attempts={}", user.getId().value(), attempts);
+            cachePort.delete(otpKey);
+            log.warn("OTP brute-force lockout | userId={} attempts={}", user.getId().value(), attempts);
             throw new AppException(ErrorCode.OTP_TOO_MANY_ATTEMPTS);
         }
 
-        String cachedCode = cachePort.getAndDelete(otpKey)
+        String cachedCode = cachePort.get(otpKey)
                 .orElseThrow(() -> new AppException(ErrorCode.OTP_EXPIRED));
 
         if (!cachedCode.equals(command.otp())) {
+            log.warn("OTP invalid | userId={} attempts={}/{}", user.getId().value(), attempts, MAX_ATTEMPTS);
             throw new AppException(ErrorCode.OTP_INVALID);
+        }
+
+        Optional<String> consumed = cachePort.getAndDelete(otpKey);
+        if (consumed.isEmpty() || !consumed.get().equals(command.otp())) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
         }
 
         user.activate();
         userRepository.save(user);
-        cachePort.delete(attemptKey);
+        cachePort.delete(attemptKey);  // reset attempt counter sau khi verify thành công
 
         log.info("User activated | userId={}", user.getId().value());
     }
