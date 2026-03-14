@@ -1,6 +1,7 @@
 package com.talkify.identity.application.handler;
 
 import java.time.Duration;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,10 +16,8 @@ import com.talkify.identity.application.port.EmailPort;
 import com.talkify.identity.application.port.OtpGeneratorPort;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpCacheKey;
-import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserId;
-import com.talkify.identity.domain.model.UserStatus;
 import com.talkify.identity.domain.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -60,9 +59,7 @@ public class OtpHandler {
         User user = userRepository.findById(userId.value())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (OtpPurpose.REGISTRATION.equals(command.purpose()) && user.getStatus() == UserStatus.ACTIVE) {
-            throw new AppException(ErrorCode.USER_ALREADY_ACTIVE);
-        }
+        command.purpose().assertValidState(user);
 
         String cacheKey = OtpCacheKey.of(user.getId(), command.purpose()).value();
         Long ttl = cachePort.getExpire(cacheKey);
@@ -76,36 +73,44 @@ public class OtpHandler {
         cachePort.set(cacheKey, code, OTP_TTL);
         cachePort.delete(OtpCacheKey.attemptOf(user.getId(), command.purpose()).value());
 
-        log.info("OTP re-sent | userId={} purpose={}", user.getId().value(), command.purpose());
+        log.info("OTP sent | userId={} purpose={}", user.getId().value(), command.purpose());
 
         emailPort.sendVerificationEmail(user.getEmail().value(), user.getDisplayName(), code);
     }
 
     @Transactional
-    public void handle(VerifyOtpCommand command) {
-        User user = userRepository.findByEmail(new Email(command.email()))
+    public void handle(VerifyOtpCommand command, UserId userId) {
+        User user = userRepository.findById(userId.value())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        command.purpose().assertValidState(user);
 
         String otpKey     = OtpCacheKey.of(user.getId(), command.purpose()).value();
         String attemptKey = OtpCacheKey.attemptOf(user.getId(), command.purpose()).value();
 
         long attempts = cachePort.increment(attemptKey, ATTEMPT_TTL);
         if (attempts > MAX_ATTEMPTS) {
-            log.warn("OTP brute-force | userId={} attempts={}", user.getId().value(), attempts);
+            cachePort.delete(otpKey);
+            log.warn("OTP brute-force lockout | userId={} attempts={}", user.getId().value(), attempts);
             throw new AppException(ErrorCode.OTP_TOO_MANY_ATTEMPTS);
         }
 
-        String cachedCode = cachePort.getAndDelete(otpKey)
+        String cachedCode = cachePort.get(otpKey)
                 .orElseThrow(() -> new AppException(ErrorCode.OTP_EXPIRED));
 
         if (!cachedCode.equals(command.otp())) {
+            log.warn("OTP invalid | userId={} attempts={}/{}", user.getId().value(), attempts, MAX_ATTEMPTS);
             throw new AppException(ErrorCode.OTP_INVALID);
         }
 
-        user.activate();
-        userRepository.save(user);
-        cachePort.delete(attemptKey);
+        Optional<String> consumed = cachePort.getAndDelete(otpKey);
+        if (consumed.isEmpty() || !consumed.get().equals(command.otp())) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
 
-        log.info("User activated | userId={}", user.getId().value());
-    }
-}
+        command.purpose().applyEffect(user);
+        userRepository.save(user);
+
+        cachePort.delete(attemptKey);
+        log.info("OTP verified | userId={} purpose={}", user.getId().value(), command.purpose());
+    }}

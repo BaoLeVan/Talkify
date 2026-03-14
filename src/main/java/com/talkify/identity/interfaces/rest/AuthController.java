@@ -41,7 +41,7 @@ public class AuthController {
 
     @PostMapping("/verify-otp") 
     public ApiResponse<Void> verifyOtp(@Valid @RequestBody VerifyOtpCommand command) {
-        otpHandler.handle(command);
+        otpHandler.handle(command, SecurityUtils.requireCurrentUserId());
         return ApiResponse.ok("Verification successful", null);
     }
 
