@@ -75,4 +75,13 @@ public class ApiResponse<T> {
                 .message(customMessage != null ? customMessage : errorCode.getMessage())
                 .build();
     }
+
+    public static <T> ApiResponse<T> error(ErrorCode errorCode, T data) {
+        return ApiResponse.<T>builder()
+                .code(errorCode.getStatus().value())
+                .errorCode(errorCode.getCode())
+                .message(errorCode.getMessage())
+                .data(data)
+                .build();
+    }
 }

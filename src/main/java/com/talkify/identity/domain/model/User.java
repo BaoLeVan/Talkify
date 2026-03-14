@@ -10,7 +10,7 @@ import lombok.Getter;
 @Getter
 public class User {
     private UserId id;
-    private String name;
+    private String username;
     private String displayName;
     private Email email;
     private String phoneNumber;
@@ -28,7 +28,7 @@ public class User {
     public static User register(UserId id, Username username, Email email, Password password, String displayName) {
         User user = new User();
         user.id = id;
-        user.name = username.value();
+        user.username = username.value();
         user.displayName = displayName;
         user.email = email;
         user.password = password;
@@ -40,7 +40,7 @@ public class User {
 
     public static User reconstruct(
             UserId id,
-            String name,
+            String username,
             String displayName,
             Email email,
             String phoneNumber,
@@ -53,7 +53,7 @@ public class User {
     ) {
         User user = new User();
         user.id = id;
-        user.name = name;
+        user.username = username;
         user.displayName = displayName;
         user.email = email;
         user.phoneNumber = phoneNumber;

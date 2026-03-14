@@ -12,6 +12,7 @@ import com.talkify.config.security.JwtProperties;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.TokenClaims;
 import com.talkify.identity.domain.model.UserId;
+import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
 
 import io.jsonwebtoken.Claims;
@@ -36,12 +37,11 @@ public class JwtAdapter implements JwtPort{
     }
 
     @Override
-    public String generateAccessToken(UserId userId, String email, String role, UserStatus status) {
+    public String generateAccessToken(UserId userId, UserRole role, UserStatus status) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId.value()))
-                .claim("email", email)
-                .claim("role", role)
+                .claim("role", role.name())
                 .claim("type", "access")
                 .claim("status", status.name())
                 .issuedAt(Date.from(now))
@@ -92,7 +92,6 @@ public class JwtAdapter implements JwtPort{
         return new TokenClaims(
                 payload.getSubject(),
                 payload.get("type", String.class),
-                payload.get("email", String.class),
                 payload.get("role", String.class),
                 payload.get("status", String.class)
         );

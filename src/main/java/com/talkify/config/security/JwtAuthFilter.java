@@ -16,6 +16,7 @@ import com.talkify.dto.response.ApiResponse;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.TokenClaims;
 import com.talkify.identity.domain.model.UserId;
+import com.talkify.identity.domain.model.UserStatus;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final String[] ALLOW_PATHS_FOR_INACTIVE_USER = {
             "/api/v1/auth/send-otp",
             "/api/v1/auth/verify-otp",
+            "/api/v1/auth/resend-otp",
     };
 
     private final JwtPort      jwtPort;
@@ -48,14 +50,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 TokenClaims claims = jwtPort.extractAllClaims(token);
 
+                // ── Reject non-access tokens (e.g. refresh token used as access) ──
                 if (!"access".equals(claims.type())) {
-                    log.warn("Invalid token type: expected access token | path={}", request.getRequestURI());
+                    log.warn("Rejected non-access token | type={} path={}",
+                            claims.type(), request.getRequestURI());
                     filterChain.doFilter(request, response);
                     return;
                 }
 
                 // ── INACTIVE user guard ──────────────────────────────────────
-                if ("INACTIVE".equals(claims.status()) && List.of(ALLOW_PATHS_FOR_INACTIVE_USER).stream().noneMatch(path -> request.getRequestURI().startsWith(path))) {
+                String status = claims.status();
+                if (UserStatus.INACTIVE.name().equals(status)
+                        && List.of(ALLOW_PATHS_FOR_INACTIVE_USER).stream().noneMatch(
+                                path -> request.getRequestURI().startsWith(path))) {
                     log.warn("INACTIVE user blocked | userId={} path={}",
                             claims.subject(), request.getRequestURI());
                     writeErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, ErrorCode.USER_NOT_VERIFIED);

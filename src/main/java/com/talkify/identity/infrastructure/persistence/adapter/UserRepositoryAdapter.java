@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import com.talkify.identity.application.dto.mapper.UserMapper;
 import com.talkify.identity.domain.model.Email;
+import com.talkify.identity.domain.model.PhoneNumber;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.Username;
 import com.talkify.identity.domain.repository.UserRepository;
@@ -53,6 +54,17 @@ public class UserRepositoryAdapter implements UserRepository {
     public Optional<User> findById(Long id) {
         return userJpaRepository.findActiveById(id)
                 .map(userMapper::toDomain);
+    }
+
+    @Override
+    public Optional<User> findByPhoneNumber(PhoneNumber phoneNumber) {
+        return userJpaRepository.findByPhoneNumber(phoneNumber.value())
+                .map(userMapper::toDomain);
+    }
+
+    @Override
+    public boolean existsByPhoneNumber(PhoneNumber phoneNumber) {
+        return userJpaRepository.existsByPhoneNumber(phoneNumber.value());
     }
     
 }

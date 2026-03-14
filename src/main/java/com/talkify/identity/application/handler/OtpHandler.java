@@ -17,6 +17,7 @@ import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpCacheKey;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.User;
+import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserStatus;
 import com.talkify.identity.domain.repository.UserRepository;
 
@@ -55,8 +56,8 @@ public class OtpHandler {
     }
 
     @Transactional(readOnly = true)
-    public void handle(ResendOtpCommand command) {
-        User user = userRepository.findByEmail(new Email(command.email()))
+    public void handle(ResendOtpCommand command, UserId userId) {
+        User user = userRepository.findById(userId.value())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (OtpPurpose.REGISTRATION.equals(command.purpose()) && user.getStatus() == UserStatus.ACTIVE) {
