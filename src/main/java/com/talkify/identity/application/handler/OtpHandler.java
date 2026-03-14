@@ -16,7 +16,6 @@ import com.talkify.identity.application.port.EmailPort;
 import com.talkify.identity.application.port.OtpGeneratorPort;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpCacheKey;
-import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.repository.UserRepository;
@@ -80,8 +79,8 @@ public class OtpHandler {
     }
 
     @Transactional
-    public void handle(VerifyOtpCommand command) {
-        User user = userRepository.findByEmail(new Email(command.email()))
+    public void handle(VerifyOtpCommand command, UserId userId) {
+        User user = userRepository.findById(userId.value())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         command.purpose().assertValidState(user);
