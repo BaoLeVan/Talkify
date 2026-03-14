@@ -19,7 +19,6 @@ import com.talkify.identity.domain.model.OtpCacheKey;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserId;
-import com.talkify.identity.domain.model.UserStatus;
 import com.talkify.identity.domain.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -61,9 +60,7 @@ public class OtpHandler {
         User user = userRepository.findById(userId.value())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (OtpPurpose.REGISTRATION.equals(command.purpose()) && user.getStatus() == UserStatus.ACTIVE) {
-            throw new AppException(ErrorCode.USER_ALREADY_ACTIVE);
-        }
+        command.purpose().assertValidState(user);
 
         String cacheKey = OtpCacheKey.of(user.getId(), command.purpose()).value();
         Long ttl = cachePort.getExpire(cacheKey);
@@ -77,7 +74,7 @@ public class OtpHandler {
         cachePort.set(cacheKey, code, OTP_TTL);
         cachePort.delete(OtpCacheKey.attemptOf(user.getId(), command.purpose()).value());
 
-        log.info("OTP re-sent | userId={} purpose={}", user.getId().value(), command.purpose());
+        log.info("OTP sent | userId={} purpose={}", user.getId().value(), command.purpose());
 
         emailPort.sendVerificationEmail(user.getEmail().value(), user.getDisplayName(), code);
     }
@@ -86,6 +83,8 @@ public class OtpHandler {
     public void handle(VerifyOtpCommand command) {
         User user = userRepository.findByEmail(new Email(command.email()))
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        command.purpose().assertValidState(user);
 
         String otpKey     = OtpCacheKey.of(user.getId(), command.purpose()).value();
         String attemptKey = OtpCacheKey.attemptOf(user.getId(), command.purpose()).value();
@@ -110,10 +109,9 @@ public class OtpHandler {
             throw new AppException(ErrorCode.OTP_EXPIRED);
         }
 
-        user.activate();
+        command.purpose().applyEffect(user);
         userRepository.save(user);
-        cachePort.delete(attemptKey);  // reset attempt counter sau khi verify thành công
 
-        log.info("User activated | userId={}", user.getId().value());
-    }
-}
+        cachePort.delete(attemptKey);
+        log.info("OTP verified | userId={} purpose={}", user.getId().value(), command.purpose());
+    }}
