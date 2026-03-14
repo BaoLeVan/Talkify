@@ -28,7 +28,9 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS     (HttpStatus.CONFLICT,              "USER_ALREADY_EXISTS",     "Email or phone number already registered"),
     USER_BANNED             (HttpStatus.FORBIDDEN,             "USER_BANNED",             "Your account has been banned"),
     USER_NOT_VERIFIED       (HttpStatus.FORBIDDEN,             "USER_NOT_VERIFIED",       "Please verify your email first"),
-    USER_NAME_ALREADY_EXISTS (HttpStatus.CONFLICT,              "USER_NAME_ALREADY_EXISTS", "Username is already taken"),
+    USERNAME_ALREADY_EXISTS (HttpStatus.CONFLICT,              "USER_NAME_ALREADY_EXISTS", "Username is already taken"),
+    USERNAME_MUST_NOT_BE_NULL   (HttpStatus.BAD_REQUEST,           "USER_NAME_MUST_NOT_BE_NULL", "Username cannot be null or empty"),
+    USERNAME_INVALID           (HttpStatus.BAD_REQUEST,           "USER_NAME_INVALID",           "Username must be at least 8 characters long and contain at least one uppercase letter, one number, and one special character"),
     USER_ALREADY_ACTIVE    (HttpStatus.BAD_REQUEST,           "USER_ALREADY_ACTIVE",     "User is already active"),
     INVALID_CREDENTIALS     (HttpStatus.UNAUTHORIZED,          "INVALID_CREDENTIALS",     "Invalid email or password"),
     INVALID_TOKEN           (HttpStatus.UNAUTHORIZED,          "INVALID_TOKEN",           "Token is invalid or expired"),
@@ -42,6 +44,9 @@ public enum ErrorCode {
     OTP_ALREADY_USED           (HttpStatus.BAD_REQUEST,           "OTP_ALREADY_USED",           "OTP code has already been used"),    
     OTP_RESEND_TOO_FREQUENT   (HttpStatus.TOO_MANY_REQUESTS,     "OTP_RESEND_TOO_FREQUENT",   "OTP resend requested too frequently, please wait before trying again"),
     PASSWORD_TOO_WEAK           (HttpStatus.BAD_REQUEST,           "PASSWORD_TOO_WEAK",         "Password must be at least 8 characters long and contain both letters and numbers"),
+    PHONE_NUMBER_ALREADY_EXISTS (HttpStatus.CONFLICT,              "PHONE_NUMBER_ALREADY_EXISTS", "Phone number is already in use"),
+    PHONE_NUMBER_INVALID          (HttpStatus.BAD_REQUEST,           "PHONE_NUMBER_INVALID",          "Invalid phone number format"),
+    PHONE_NUMBER_MUST_NOT_BE_NULL (HttpStatus.BAD_REQUEST,           "PHONE_NUMBER_MUST_NOT_BE_NULL", "Phone number cannot be null or empty"),
     
     // ── Messaging ─────────────────────────────────────────────────────
     MESSAGE_NOT_FOUND       (HttpStatus.NOT_FOUND,             "MESSAGE_NOT_FOUND",       "Message not found"),

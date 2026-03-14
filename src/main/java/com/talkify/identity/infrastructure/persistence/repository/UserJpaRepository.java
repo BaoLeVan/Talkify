@@ -14,10 +14,12 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
     // ── Existence check ───────────────────────────────────────────────────
     boolean existsByEmail(String email);
     boolean existsByUsername(String username);
+    boolean existsByPhoneNumber(String phoneNumber);
 
     // ── Raw lookup (includes soft-deleted) ─────────────────────────────
     Optional<UserJpaEntity> findByEmail(String email);
     Optional<UserJpaEntity> findByUsername(String username);
+    Optional<UserJpaEntity> findByPhoneNumber(String phoneNumber);
 
     // ── Active-only (excludes soft-deleted rows) ───────────────────────
     @Query("SELECT u FROM UserJpaEntity u WHERE u.email = :email AND u.deletedAt IS NULL")

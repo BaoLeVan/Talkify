@@ -15,23 +15,22 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false          # tắt log SQL — giảm overhead I/O mỗi request
+    open-in-view: false      # tắt OSIV — không giữ DB connection suốt HTTP request
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  mongodb:
-    uri: mongodb+srv://warcraftkun:CmeYUkN0DJHeVBmH@cluster0-baole.6bydbes.mongodb.net/talkify_db?appName=Cluster0-BaoLe
-    # explicit database name in case it cannot be inferred from the URI
-  # alternatively you can set spring.data.mongodb.database directly:
-  # data:
-  #   mongodb:
-  #     database: talkify_db
   data:
+    mongodb:
+      uri: mongodb+srv://warcraftkun:CmeYUkN0DJHeVBmH@cluster0-baole.6bydbes.mongodb.net/talkify_db?appName=Cluster0-BaoLe
+      # docker-compose override: SPRING_DATA_MONGODB_URI → mongodb://talkify:talkify@mongodb:27017/...
+      auto-index-creation: false
     redis:
       host: localhost
       port: 6379
-      timeout: 2000
+      timeout: 2000ms          # connection timeout
+      connect-timeout: 2000ms  # đổi sang explicit ms unit
   
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}

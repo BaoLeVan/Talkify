@@ -35,11 +35,7 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_POST = {
         "/api/v1/auth/register",
-        "/api/v1/auth/verify-email",
-        // "/api/v1/users/register",
-        // "/v3/api-docs/**",
-        // "/swagger-ui/**",
-        // "/swagger-ui.html"
+        "/api/v1/auth/login",
     };
 
     private static final String[] PUBLIC_GET = {

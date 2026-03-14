@@ -14,4 +14,8 @@ public record Email(String value) {
     public static Email of(String value) {
         return new Email(value);
     }
+
+    public static boolean isValid(String value) {
+        return value != null && EMAIL_PATTERN.matcher(value).matches();
+    }
 }

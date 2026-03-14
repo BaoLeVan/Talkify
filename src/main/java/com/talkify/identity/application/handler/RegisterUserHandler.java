@@ -9,7 +9,10 @@ import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.id.IdGenerator;
 import com.talkify.identity.application.command.RegisterUserCommand;
-import com.talkify.identity.domain.event.UserRegistedEvent;
+import com.talkify.identity.application.dto.response.AuthResponse;
+import com.talkify.identity.application.dto.response.AuthResponse.UserInfo;
+import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.domain.event.UserRegisteredEvent;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.Password;
@@ -28,9 +31,10 @@ public class RegisterUserHandler {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final IdGenerator idGenerator;
+    private final JwtPort jwtPort;
 
     @Transactional
-    public void handle(RegisterUserCommand command) {
+    public AuthResponse handle(RegisterUserCommand command) {
         Email email = Email.of(command.email());
         Username username = Username.of(command.username());
 
@@ -38,7 +42,7 @@ public class RegisterUserHandler {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
         if (userRepository.existsByUsername(username)) {
-            throw new AppException(ErrorCode.USER_NAME_ALREADY_EXISTS);
+            throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
         }
 
         Password.validateRaw(command.password());
@@ -50,8 +54,25 @@ public class RegisterUserHandler {
 
         userRepository.save(user);
 
+        String accessToken  = jwtPort.generateAccessToken(user.getId(), user.getRole(), user.getStatus());
+        String refreshToken = jwtPort.generateRefreshToken(user.getId());
+
         eventPublisher.publishEvent(
-                new UserRegistedEvent(email.value(), command.displayName(), OtpPurpose.REGISTRATION)
+                new UserRegisteredEvent(email.value(), command.displayName(), OtpPurpose.REGISTRATION)
+        );
+
+        return AuthResponse.of(
+                accessToken,
+                refreshToken,
+                new UserInfo(
+                        user.getId().value(),
+                        user.getEmail().value(),
+                        user.getUsername(),
+                        null,
+                        user.getRole().name(),
+                        user.getDisplayName(),
+                        user.getStatus().name()
+                )
         );
     }
 }

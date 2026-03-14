@@ -1,7 +1,7 @@
 package com.talkify.identity.application.handler;
 
 import com.talkify.identity.application.command.SendOtpCommand;
-import com.talkify.identity.domain.event.UserRegistedEvent;
+import com.talkify.identity.domain.event.UserRegisteredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -17,7 +17,7 @@ public class OtpEventListener {
     private final OtpHandler otpHandler;
 
     /**
-     * Lắng nghe UserRegistedEvent và gửi OTP SAU KHI DB commit thành công.
+     * Lắng nghe UserRegisteredEvent và gửi OTP SAU KHI DB commit thành công.
      *
      * - AFTER_COMMIT: đảm bảo user đã tồn tại trong DB trước khi gửi OTP.
      * - @Async: không block transaction thread.
@@ -27,8 +27,8 @@ public class OtpEventListener {
      */
     @Async("emailTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onUserRegistered(UserRegistedEvent event) {
-        log.info("Handling UserRegistedEvent AFTER_COMMIT | email={}", event.email());
+    public void onUserRegistered(UserRegisteredEvent event) {
+        log.info("Handling UserRegisteredEvent AFTER_COMMIT | email={}", event.email());
         try {
             otpHandler.handle(new SendOtpCommand(event.email(), event.otpPurpose()));
         } catch (Exception e) {

@@ -64,6 +64,9 @@ services:
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: true
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: true
 
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+
       # Tắt Kafka auto-config nếu chưa dùng
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     depends_on:
