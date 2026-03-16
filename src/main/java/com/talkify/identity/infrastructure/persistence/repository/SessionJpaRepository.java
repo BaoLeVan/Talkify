@@ -40,4 +40,11 @@ public interface SessionJpaRepository extends JpaRepository<SessionJpaEntity, Lo
     @Modifying
     @Query("DELETE FROM SessionJpaEntity s WHERE s.expiresAt < :now")
     void deleteExpiredBefore(@Param("now") Instant now);
+
+    @Modifying
+    @Query("UPDATE SessionJpaEntity s SET s.revokedAt = :now " +
+           "WHERE s.userId = :userId AND s.tokenHash <> :tokenHash AND s.revokedAt IS NULL")
+    void revokeAllByUserIdExceptTokenHash(@Param("userId") Long userId,
+                                         @Param("tokenHash") String tokenHash,
+                                         @Param("now") Instant now);
 }

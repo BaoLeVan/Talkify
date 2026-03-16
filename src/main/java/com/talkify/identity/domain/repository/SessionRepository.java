@@ -15,5 +15,6 @@ public interface SessionRepository {
     void revokeByTokenHash(String tokenHash);
     void revokeByIds(UserId userId, List<SessionId> sessionIds);
     void revokeAllByUserId(UserId userId);
+    void revokeAllByUserIdExceptTokenHash(UserId userId, String tokenHash);
     void deleteExpired();
 }

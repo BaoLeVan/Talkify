@@ -77,11 +77,16 @@ public class SessionRepositoryAdapter implements SessionRepository {
 
     @Override
     @Transactional
+    public void revokeAllByUserIdExceptTokenHash(UserId userId, String tokenHash) {
+        sessionJpaRepository.revokeAllByUserIdExceptTokenHash(userId.value(), tokenHash, Instant.now());
+    }
+
+    @Override
+    @Transactional
     public void deleteExpired() {
         sessionJpaRepository.deleteExpiredBefore(Instant.now());
     }
 
-    // ── Mapping helpers ────────────────────────────────────────────────────
 
     private SessionJpaEntity toEntity(UserSession session) {
         DeviceInfo di = session.getDeviceInfo();

@@ -37,7 +37,6 @@ public class SecurityConfig {
         "/api/v1/auth/register",
         "/api/v1/auth/login",
         "/api/v1/auth/refresh-token",
-        "/api/v1/auth/logout",       // public: AT có thể expire khi user muốn logout
     };
 
     private static final String[] PUBLIC_GET = {
