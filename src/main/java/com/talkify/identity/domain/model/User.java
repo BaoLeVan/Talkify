@@ -23,7 +23,6 @@ public class User {
     private Instant updatedAt;
 
     private final List<Object> domainEvents = new ArrayList<>();
-    private final List<Device> devices = new ArrayList<>();
 
     public static User register(UserId id, Username username, Email email, Password password, String displayName) {
         User user = new User();
@@ -79,15 +78,30 @@ public class User {
         this.status = UserStatus.ACTIVE;
     }
 
-    public void addDomainEvent(Object event) {
-        this.domainEvents.add(event);
+    // ── Status helpers ──────────────────────────────────────────────────────
+
+    public boolean isActive()   { return status == UserStatus.ACTIVE; }
+    public boolean isInactive() { return status == UserStatus.INACTIVE; }
+    public boolean isBanned()   { return status == UserStatus.BANNED; }
+    public boolean isDeleted()  { return status == UserStatus.DELETED; }
+
+    // ── Password ────────────────────────────────────────────────────────────
+
+    /**
+     * Đổi password.
+     * Việc revoke sessions (nếu cần) là trách nhiệm của Handler,
+     * thông qua SessionRepository — không phải của User Aggregate.
+     */
+    public void changePassword(Password newPassword) {
+        this.password = newPassword;
     }
 
-    public void registerDevice(Device device) {
-        boolean exists = devices.stream().anyMatch(d -> d.equals(device));
-        if (!exists) {
-            devices.add(device);
-        }
+    // ── Domain events ───────────────────────────────────────────────────────
+
+
+
+    public void addDomainEvent(Object event) {
+        this.domainEvents.add(event);
     }
 
     public List<Object> pullDomainEvents() {

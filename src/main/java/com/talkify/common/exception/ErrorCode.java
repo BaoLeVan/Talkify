@@ -47,7 +47,9 @@ public enum ErrorCode {
     PHONE_NUMBER_ALREADY_EXISTS (HttpStatus.CONFLICT,              "PHONE_NUMBER_ALREADY_EXISTS", "Phone number is already in use"),
     PHONE_NUMBER_INVALID          (HttpStatus.BAD_REQUEST,           "PHONE_NUMBER_INVALID",          "Invalid phone number format"),
     PHONE_NUMBER_MUST_NOT_BE_NULL (HttpStatus.BAD_REQUEST,           "PHONE_NUMBER_MUST_NOT_BE_NULL", "Phone number cannot be null or empty"),
-    
+    SESSION_NOT_FOUND             (HttpStatus.UNAUTHORIZED,          "SESSION_NOT_FOUND",             "Session not found or already revoked"),
+    REFRESH_TOKEN_REUSE_DETECTED  (HttpStatus.UNAUTHORIZED,          "REFRESH_TOKEN_REUSE_DETECTED",  "Refresh token reuse detected — all sessions have been revoked for security"),
+    REFRESH_TOKEN_EXPIRED         (HttpStatus.UNAUTHORIZED,          "REFRESH_TOKEN_EXPIRED",         "Refresh token has expired, please login again"),
     // ── Messaging ─────────────────────────────────────────────────────
     MESSAGE_NOT_FOUND       (HttpStatus.NOT_FOUND,             "MESSAGE_NOT_FOUND",       "Message not found"),
     MESSAGE_ALREADY_REVOKED (HttpStatus.CONFLICT,              "MESSAGE_ALREADY_REVOKED", "Message has already been revoked"),

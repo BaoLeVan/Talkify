@@ -10,4 +10,11 @@ public interface JwtPort {
     boolean validateToken(String token);
     UserId extractUserId(String token);
     TokenClaims extractAllClaims(String token);
+    /** TTL của refresh token tính bằng giây — dùng để tính expiresAt khi tạo session. */
+    long getRefreshTokenTtl();
+    /**
+     * Ngưỡng gần hết hạn tính bằng giây (default 1 ngày).
+     * Nếu remaining TTL ≤ threshold → proactive rotation.
+     */
+    long getRefreshThreshold();
 }

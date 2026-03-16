@@ -12,7 +12,9 @@ import com.talkify.identity.application.command.RegisterUserCommand;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.dto.response.AuthResponse.UserInfo;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.event.UserRegisteredEvent;
+import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.Password;
@@ -30,11 +32,12 @@ public class RegisterUserHandler {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final SessionService sessionService;
     private final IdGenerator idGenerator;
     private final JwtPort jwtPort;
 
     @Transactional
-    public AuthResponse handle(RegisterUserCommand command) {
+    public AuthResponse handle(RegisterUserCommand command, DeviceInfo deviceInfo) {
         Email email = Email.of(command.email());
         Username username = Username.of(command.username());
 
@@ -55,7 +58,8 @@ public class RegisterUserHandler {
         userRepository.save(user);
 
         String accessToken  = jwtPort.generateAccessToken(user.getId(), user.getRole(), user.getStatus());
-        String refreshToken = jwtPort.generateRefreshToken(user.getId());
+
+        String refreshToken = sessionService.createSession(user.getId(), deviceInfo);
 
         eventPublisher.publishEvent(
                 new UserRegisteredEvent(email.value(), command.displayName(), OtpPurpose.REGISTRATION)
