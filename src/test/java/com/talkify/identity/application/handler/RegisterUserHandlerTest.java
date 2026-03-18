@@ -27,6 +27,9 @@ import com.talkify.common.id.IdGenerator;
 import com.talkify.identity.application.command.RegisterUserCommand;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.domain.model.DeviceInfo;
+import com.talkify.identity.domain.model.DevicePlatform;
+import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.event.UserRegisteredEvent;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpPurpose;
@@ -43,12 +46,14 @@ class RegisterUserHandlerTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private SessionService sessionService;
     @Mock private IdGenerator idGenerator;
     @Mock private JwtPort jwtPort;
 
     @InjectMocks private RegisterUserHandler handler;
 
     private RegisterUserCommand validCommand;
+    private static final DeviceInfo DEVICE_INFO = DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1");
 
     @BeforeEach
     void setUp() {
@@ -72,9 +77,9 @@ class RegisterUserHandlerTest {
             when(idGenerator.nextId()).thenReturn(100L);
             when(jwtPort.generateAccessToken(any(), eq(UserRole.USER), eq(UserStatus.INACTIVE)))
                     .thenReturn("access-token");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("refresh-token");
+            when(sessionService.createSession(any(), any())).thenReturn("refresh-token");
 
-            AuthResponse response = handler.handle(validCommand);
+            AuthResponse response = handler.handle(validCommand, DEVICE_INFO);
 
             assertThat(response.accessToken()).isEqualTo("access-token");
             assertThat(response.refreshToken()).isEqualTo("refresh-token");
@@ -94,9 +99,9 @@ class RegisterUserHandlerTest {
             when(passwordEncoder.encode(anyString())).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(100L);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            handler.handle(validCommand);
+            handler.handle(validCommand, DEVICE_INFO);
 
             ArgumentCaptor<UserRegisteredEvent> captor = ArgumentCaptor.forClass(UserRegisteredEvent.class);
             verify(eventPublisher).publishEvent(captor.capture());
@@ -114,9 +119,9 @@ class RegisterUserHandlerTest {
             when(passwordEncoder.encode("Abcdef12")).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(100L);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            handler.handle(validCommand);
+            handler.handle(validCommand, DEVICE_INFO);
 
             verify(passwordEncoder).encode("Abcdef12");
 
@@ -137,7 +142,7 @@ class RegisterUserHandlerTest {
         void emailAlreadyExists() {
             when(userRepository.existsByEmail(any(Email.class))).thenReturn(true);
 
-            assertThatThrownBy(() -> handler.handle(validCommand))
+            assertThatThrownBy(() -> handler.handle(validCommand, DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
@@ -152,7 +157,7 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByEmail(any(Email.class))).thenReturn(false);
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(true);
 
-            assertThatThrownBy(() -> handler.handle(validCommand))
+            assertThatThrownBy(() -> handler.handle(validCommand, DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS);
@@ -169,7 +174,7 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByEmail(any(Email.class))).thenReturn(false);
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(false);
 
-            assertThatThrownBy(() -> handler.handle(weak))
+            assertThatThrownBy(() -> handler.handle(weak, DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.PASSWORD_TOO_WEAK);
@@ -195,7 +200,7 @@ class RegisterUserHandlerTest {
             when(userRepository.save(any(User.class)))
                     .thenThrow(new RuntimeException("DB connection lost"));
 
-            assertThatThrownBy(() -> handler.handle(validCommand))
+            assertThatThrownBy(() -> handler.handle(validCommand, DEVICE_INFO))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage("DB connection lost");
 
@@ -210,9 +215,9 @@ class RegisterUserHandlerTest {
             when(passwordEncoder.encode(anyString())).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(999L);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            AuthResponse response = handler.handle(validCommand);
+            AuthResponse response = handler.handle(validCommand, DEVICE_INFO);
 
             assertThat(response.user().id()).isEqualTo(999L);
             verify(idGenerator).nextId();
@@ -228,7 +233,7 @@ class RegisterUserHandlerTest {
             when(jwtPort.generateAccessToken(any(), any(), any()))
                     .thenThrow(new RuntimeException("JWT signing error"));
 
-            assertThatThrownBy(() -> handler.handle(validCommand))
+            assertThatThrownBy(() -> handler.handle(validCommand, DEVICE_INFO))
                     .isInstanceOf(RuntimeException.class);
 
             // User was already saved before JWT generation

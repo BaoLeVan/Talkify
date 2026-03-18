@@ -13,21 +13,19 @@ import lombok.Setter;
 @Setter
 @Validated
 @Component
-@ConfigurationProperties(prefix = "security.jwt")
-public class JwtProperties {
+@ConfigurationProperties(prefix = "security.cookie")
+public class CookieProperties {
+
     @NotBlank
-    private String secretKey;
+    private String name = "refresh_token";
+
+    @NotBlank
+    private String path = "/api/v1/auth";
 
     @Positive
-    private long accessTokenTtl;
+    private long maxAge = 604800;
 
-    @Positive
-    private long refreshTokenTtl;
+    private boolean secure = false;
 
-    /**
-     * Ngưỡng gần hết hạn để trigger proactive rotation, tính bằng giây.
-     * Cấu hình qua env var: JWT_REFRESH_THRESHOLD (default: 86400 = 1 ngày).
-     */
-    @Positive
-    private long refreshThreshold = 86400;
+    private String sameSite = "Strict";
 }

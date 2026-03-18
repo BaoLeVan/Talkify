@@ -96,4 +96,14 @@ public class JwtAdapter implements JwtPort{
                 payload.get("status", String.class)
         );
     }
+
+    @Override
+    public long getRefreshTokenTtl() {
+        return jwtProperties.getRefreshTokenTtl();
+    }
+
+    @Override
+    public long getRefreshThreshold() {
+        return jwtProperties.getRefreshThreshold();
+    }
 }

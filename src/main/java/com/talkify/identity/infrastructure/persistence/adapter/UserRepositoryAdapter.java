@@ -66,5 +66,6 @@ public class UserRepositoryAdapter implements UserRepository {
     public boolean existsByPhoneNumber(PhoneNumber phoneNumber) {
         return userJpaRepository.existsByPhoneNumber(phoneNumber.value());
     }
-    
+
 }
+

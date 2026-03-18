@@ -204,13 +204,20 @@ CREATE INDEX IF NOT EXISTS idx_media_conv       ON media_files(conversation_id, 
 --  Lưu hash SHA-256 thay vì raw token để giảm impact nếu DB bị leak.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id          BIGINT       PRIMARY KEY,                       -- Snowflake ID
-    user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash  VARCHAR(255) UNIQUE NOT NULL,                   -- SHA-256 của actual token
-    device_id   BIGINT       REFERENCES devices(id) ON DELETE SET NULL,
-    expires_at  TIMESTAMPTZ  NOT NULL,
-    revoked_at  TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    id           BIGINT       PRIMARY KEY,                       -- Snowflake ID
+    user_id      BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash   VARCHAR(255) UNIQUE NOT NULL,                   -- SHA-256 của actual token
+    -- DeviceInfo (embedded Value Object — không FK sang devices)
+    device_name  VARCHAR(100),                                   -- "Chrome on MacOS", "iPhone 15"
+    device_type  VARCHAR(10)                                     -- WEB / IOS / ANDROID
+                 CHECK (device_type IN ('WEB', 'IOS', 'ANDROID')),
+    ip_address   VARCHAR(45),                                    -- IPv4 hoặc IPv6
+    -- device_id: giữ lại để link sang devices (push notification) nếu cần
+    device_id    BIGINT       REFERENCES devices(id) ON DELETE SET NULL,
+    expires_at   TIMESTAMPTZ  NOT NULL,
+    last_used_at TIMESTAMPTZ,                                    -- cập nhật mỗi lần refresh (LRU)
+    revoked_at   TIMESTAMPTZ,                                    -- NULL = còn active
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 -- Kiểm tra token còn hạn và chưa bị revoke

@@ -46,7 +46,15 @@ security:
     secret-key: ${JWT_SECRET_KEY}
     access-token-ttl: 900
     refresh-token-ttl: 604800
+    refresh-threshold: ${JWT_REFRESH_THRESHOLD:86400}   # giây; default 1 ngày
   cors:
     allowed-origins: "*"
     allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
     allowed-headers: "*"
+  cookie:
+    name: refresh_token
+    path: /api/v1/auth          # cookie chỉ gửi đến /api/v1/auth/* — không leak ra các API khác
+    same-site: Strict           # chặn CSRF: cookie không gửi trong cross-site request
+    secure: ${COOKIE_SECURE:false}  # true ở production (HTTPS), false ở local dev
+    # QUAN TRỌNG: max-age phải khớp với security.jwt.refresh-token-ttl (604800s = 7 ngày)
+    max-age: ${COOKIE_MAX_AGE:604800}

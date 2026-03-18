@@ -12,6 +12,8 @@ import com.talkify.identity.application.command.SendOtpCommand;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.dto.response.AuthResponse.UserInfo;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.application.service.SessionService;
+import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.Identifier;
 import com.talkify.identity.domain.model.OtpPurpose;
@@ -21,6 +23,7 @@ import com.talkify.identity.domain.model.UserStatus;
 import com.talkify.identity.domain.model.Username;
 import com.talkify.identity.domain.repository.UserRepository;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -29,9 +32,11 @@ public class LoginHandler {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpHandler otpHandler;
+    private final SessionService sessionService;
     private final JwtPort jwtPort;
 
-    public AuthResponse handle(LoginCommand command) {
+    @Transactional
+    public AuthResponse handle(LoginCommand command, DeviceInfo deviceInfo) {
         Identifier identifier = Identifier.of(command.identifier());
 
         User user = findUserByIdentifier(identifier)
@@ -52,7 +57,8 @@ public class LoginHandler {
                         user.getRole(),
                         user.getStatus()
                 );
-                String refreshToken = jwtPort.generateRefreshToken(user.getId());
+
+                String refreshToken = sessionService.createSession(user.getId(), deviceInfo);
 
                 yield AuthResponse.of(
                         accessToken,

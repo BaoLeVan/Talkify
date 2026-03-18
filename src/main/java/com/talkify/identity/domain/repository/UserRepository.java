@@ -13,6 +13,7 @@ public interface UserRepository {
     Optional<User> findByUsername(Username username);
     Optional<User> findByPhoneNumber(PhoneNumber phoneNumber);
     Optional<User> findById(Long id);
+
     boolean existsByEmail(Email email);
     boolean existsByUsername(Username username);
     boolean existsByPhoneNumber(PhoneNumber phoneNumber);

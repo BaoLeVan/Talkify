@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,7 +12,6 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.Optional;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,6 +27,9 @@ import com.talkify.identity.application.command.LoginCommand;
 import com.talkify.identity.application.command.SendOtpCommand;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.domain.model.DeviceInfo;
+import com.talkify.identity.domain.model.DevicePlatform;
+import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.Password;
 import com.talkify.identity.domain.model.User;
@@ -46,6 +47,7 @@ class LoginHandlerTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private OtpHandler otpHandler;
+    @Mock private SessionService sessionService;
     @Mock private JwtPort jwtPort;
 
     @InjectMocks private LoginHandler handler;
@@ -53,6 +55,7 @@ class LoginHandlerTest {
     private static final UserId USER_ID = UserId.of(1L);
     private static final String RAW_PASSWORD = "Abcdef12";
     private static final String HASHED = "$2a$10$hashed";
+    private static final DeviceInfo DEVICE_INFO = DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1");
 
     private User buildUser(UserStatus status) {
         return User.reconstruct(
@@ -78,9 +81,9 @@ class LoginHandlerTest {
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
             when(jwtPort.generateAccessToken(USER_ID, UserRole.USER, UserStatus.ACTIVE))
                     .thenReturn("access");
-            when(jwtPort.generateRefreshToken(USER_ID)).thenReturn("refresh");
+            when(sessionService.createSession(any(), any())).thenReturn("refresh");
 
-            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD));
+            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
             assertThat(response.accessToken()).isEqualTo("access");
             assertThat(response.refreshToken()).isEqualTo("refresh");
@@ -95,9 +98,9 @@ class LoginHandlerTest {
             when(userRepository.findByUsername(any(Username.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            AuthResponse response = handler.handle(new LoginCommand("testuser", RAW_PASSWORD));
+            AuthResponse response = handler.handle(new LoginCommand("testuser", RAW_PASSWORD), DEVICE_INFO);
 
             assertThat(response.user().username()).isEqualTo("testuser");
         }
@@ -109,9 +112,9 @@ class LoginHandlerTest {
             when(userRepository.findByPhoneNumber(any(PhoneNumber.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            AuthResponse response = handler.handle(new LoginCommand("+84912345678", RAW_PASSWORD));
+            AuthResponse response = handler.handle(new LoginCommand("+84912345678", RAW_PASSWORD), DEVICE_INFO);
 
             assertThat(response).isNotNull();
         }
@@ -123,9 +126,9 @@ class LoginHandlerTest {
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD));
+            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
             // +84912345678 (12 chars) → prefix 4 + stars 6 + suffix 2
             assertThat(response.user().phoneNumber()).isEqualTo("+849******78");
@@ -143,7 +146,7 @@ class LoginHandlerTest {
         void userNotFound() {
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> handler.handle(new LoginCommand("x@gmail.com", RAW_PASSWORD)))
+            assertThatThrownBy(() -> handler.handle(new LoginCommand("x@gmail.com", RAW_PASSWORD), DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
@@ -158,7 +161,7 @@ class LoginHandlerTest {
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(false);
 
-            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD)))
+            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
@@ -181,9 +184,9 @@ class LoginHandlerTest {
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
             when(jwtPort.generateAccessToken(USER_ID, UserRole.USER, UserStatus.INACTIVE))
                     .thenReturn("inactive-token");
-            when(jwtPort.generateRefreshToken(USER_ID)).thenReturn("refresh");
+            when(sessionService.createSession(any(), any())).thenReturn("refresh");
 
-            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD));
+            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
             assertThat(response.accessToken()).isEqualTo("inactive-token");
             assertThat(response.user().status()).isEqualTo("INACTIVE");
@@ -197,7 +200,7 @@ class LoginHandlerTest {
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
 
-            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD)))
+            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USER_BANNED);
@@ -212,7 +215,7 @@ class LoginHandlerTest {
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
 
-            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD)))
+            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO))
                     .isInstanceOf(AppException.class)
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
@@ -234,7 +237,7 @@ class LoginHandlerTest {
             doThrow(new RuntimeException("Email service down"))
                     .when(otpHandler).handle(any(SendOtpCommand.class));
 
-            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD)))
+            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage("Email service down");
 
@@ -250,7 +253,7 @@ class LoginHandlerTest {
             when(jwtPort.generateAccessToken(any(), any(), any()))
                     .thenThrow(new RuntimeException("Key not configured"));
 
-            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD)))
+            assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage("Key not configured");
         }
@@ -268,9 +271,9 @@ class LoginHandlerTest {
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
             when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(jwtPort.generateRefreshToken(any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn("t");
 
-            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD));
+            AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
             assertThat(response.user().phoneNumber()).isNull();
         }
