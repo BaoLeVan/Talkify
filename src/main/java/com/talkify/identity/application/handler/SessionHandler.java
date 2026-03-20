@@ -10,6 +10,7 @@ import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.command.RefreshTokenCommand;
+import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.TokenClaims;
@@ -82,27 +83,31 @@ public class SessionHandler {
         if (user.isBanned())   throw new AppException(ErrorCode.USER_BANNED);
         if (user.isDeleted())  throw new AppException(ErrorCode.INVALID_CREDENTIALS);
 
-        String newAccessToken = jwtPort.generateAccessToken(
-                user.getId(), user.getRole(), user.getStatus());
-
         long remainingSeconds = Duration.between(clock.instant(), session.getExpiresAt()).getSeconds();
 
         if (remainingSeconds > jwtPort.getRefreshThreshold()) {
+            // Reactive renewal: giữ RT cũ, chỉ cấp AT mới với sessionId hiện tại
             session.markUsed();
             sessionRepository.save(session);
+
+            String newAccessToken = jwtPort.generateAccessToken(
+                    user.getId(), session.getId(), user.getRole(), user.getStatus());
 
             log.debug("Access token renewed | userId={} remainingTtl={}s",
                     user.getId().value(), remainingSeconds);
             return AuthResponse.of(newAccessToken, rawToken, null);
 
         } else {
+            // Proactive rotation: revoke session cũ, tạo session mới
             sessionRepository.revokeByTokenHash(tokenHash);
 
-            String newRefreshToken = sessionService.createSession(user.getId(), deviceInfo);
+            SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
+            String newAccessToken = jwtPort.generateAccessToken(
+                    user.getId(), sessionResult.sessionId(), user.getRole(), user.getStatus());
 
             log.info("Refresh token rotated | userId={} remainingTtl={}s",
                     user.getId().value(), remainingSeconds);
-            return AuthResponse.of(newAccessToken, newRefreshToken, null);
+            return AuthResponse.of(newAccessToken, sessionResult.rawRefreshToken(), null);
         }
     }
 }

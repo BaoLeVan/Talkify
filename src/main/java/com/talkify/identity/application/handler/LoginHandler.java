@@ -9,6 +9,7 @@ import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.identity.application.command.LoginCommand;
 import com.talkify.identity.application.command.SendOtpCommand;
+import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.dto.response.AuthResponse.UserInfo;
 import com.talkify.identity.application.port.JwtPort;
@@ -52,17 +53,17 @@ public class LoginHandler {
                     otpHandler.handle(new SendOtpCommand(user.getEmail().value(), OtpPurpose.REGISTRATION));
                 }
 
-                String accessToken  = jwtPort.generateAccessToken(
+                SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
+                String accessToken = jwtPort.generateAccessToken(
                         user.getId(),
+                        sessionResult.sessionId(),
                         user.getRole(),
                         user.getStatus()
                 );
 
-                String refreshToken = sessionService.createSession(user.getId(), deviceInfo);
-
                 yield AuthResponse.of(
                         accessToken,
-                        refreshToken,
+                        sessionResult.rawRefreshToken(),
                         new UserInfo(
                                 user.getId().value(),
                                 user.getEmail().value(),

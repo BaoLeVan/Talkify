@@ -1,11 +1,12 @@
 package com.talkify.identity.application.port;
 
+import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
 
 public interface JwtPort {
-    String generateAccessToken(UserId userId, UserRole role, UserStatus status);
+    String generateAccessToken(UserId userId, SessionId sessionId, UserRole role, UserStatus status);
     String generateRefreshToken(UserId userId);
     boolean validateToken(String token);
     UserId extractUserId(String token);

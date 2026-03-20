@@ -25,11 +25,13 @@ import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.id.IdGenerator;
 import com.talkify.identity.application.command.RegisterUserCommand;
+import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.DevicePlatform;
 import com.talkify.identity.application.service.SessionService;
+import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.event.UserRegisteredEvent;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpPurpose;
@@ -53,7 +55,8 @@ class RegisterUserHandlerTest {
     @InjectMocks private RegisterUserHandler handler;
 
     private RegisterUserCommand validCommand;
-    private static final DeviceInfo DEVICE_INFO = DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1");
+    private static final DeviceInfo DEVICE_INFO  = DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1");
+    private static final SessionId  SESSION_ID   = new SessionId(100L);
 
     @BeforeEach
     void setUp() {
@@ -75,9 +78,9 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(false);
             when(passwordEncoder.encode("Abcdef12")).thenReturn("$2a$10$hashedpassword");
             when(idGenerator.nextId()).thenReturn(100L);
-            when(jwtPort.generateAccessToken(any(), eq(UserRole.USER), eq(UserStatus.INACTIVE)))
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "refresh-token"));
+            when(jwtPort.generateAccessToken(any(), eq(SESSION_ID), eq(UserRole.USER), eq(UserStatus.INACTIVE)))
                     .thenReturn("access-token");
-            when(sessionService.createSession(any(), any())).thenReturn("refresh-token");
 
             AuthResponse response = handler.handle(validCommand, DEVICE_INFO);
 
@@ -98,8 +101,8 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(100L);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             handler.handle(validCommand, DEVICE_INFO);
 
@@ -118,8 +121,8 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(false);
             when(passwordEncoder.encode("Abcdef12")).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(100L);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             handler.handle(validCommand, DEVICE_INFO);
 
@@ -214,8 +217,8 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(999L);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             AuthResponse response = handler.handle(validCommand, DEVICE_INFO);
 
@@ -230,7 +233,8 @@ class RegisterUserHandlerTest {
             when(userRepository.existsByUsername(any(Username.class))).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("$2a$hashed");
             when(idGenerator.nextId()).thenReturn(100L);
-            when(jwtPort.generateAccessToken(any(), any(), any()))
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any()))
                     .thenThrow(new RuntimeException("JWT signing error"));
 
             assertThatThrownBy(() -> handler.handle(validCommand, DEVICE_INFO))

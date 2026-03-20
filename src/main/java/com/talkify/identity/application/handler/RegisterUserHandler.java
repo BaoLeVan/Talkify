@@ -11,6 +11,7 @@ import com.talkify.common.id.IdGenerator;
 import com.talkify.identity.application.command.RegisterUserCommand;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.dto.response.AuthResponse.UserInfo;
+import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.event.UserRegisteredEvent;
@@ -56,10 +57,13 @@ public class RegisterUserHandler {
                 Password.ofHashed(hashedPassword), command.displayName());
 
         userRepository.save(user);
-
-        String accessToken  = jwtPort.generateAccessToken(user.getId(), user.getRole(), user.getStatus());
-
-        String refreshToken = sessionService.createSession(user.getId(), deviceInfo);
+        SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
+        String accessToken = jwtPort.generateAccessToken(
+                user.getId(),
+                sessionResult.sessionId(),
+                user.getRole(),
+                user.getStatus()
+        );
 
         eventPublisher.publishEvent(
                 new UserRegisteredEvent(email.value(), command.displayName(), OtpPurpose.REGISTRATION)
@@ -67,12 +71,12 @@ public class RegisterUserHandler {
 
         return AuthResponse.of(
                 accessToken,
-                refreshToken,
+                sessionResult.rawRefreshToken(),
                 new UserInfo(
                         user.getId().value(),
                         user.getEmail().value(),
                         user.getUsername(),
-                        null,
+                        user.getPhoneNumber(),
                         user.getRole().name(),
                         user.getDisplayName(),
                         user.getStatus().name()

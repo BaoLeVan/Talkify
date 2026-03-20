@@ -1,6 +1,5 @@
 package com.talkify.identity.interfaces.rest;
 
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +10,7 @@ import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.security.SecurityUtils;
 import com.talkify.dto.response.ApiResponse;
 import com.talkify.identity.application.command.LoginCommand;
+import com.talkify.identity.application.command.LogoutCommand;
 import com.talkify.identity.application.command.RefreshTokenCommand;
 import com.talkify.identity.application.command.RegisterUserCommand;
 import com.talkify.identity.application.command.ResendOtpCommand;
@@ -22,6 +22,8 @@ import com.talkify.identity.application.handler.OtpHandler;
 import com.talkify.identity.application.handler.RegisterUserHandler;
 import com.talkify.identity.application.handler.SessionHandler;
 import com.talkify.identity.domain.model.DeviceInfo;
+import com.talkify.identity.domain.model.UserId;
+import com.talkify.identity.interfaces.rest.dto.LogoutRequest;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,6 +38,7 @@ public class AuthController {
     private final RegisterUserHandler      registerUserHandler;
     private final SessionHandler           sessionHandler;
     private final LoginHandler             loginHandler;
+    private final LogoutHandler            logoutHandler;
     private final OtpHandler               otpHandler;
     private final DeviceContextExtractor   deviceContextExtractor;
     private final RefreshTokenCookieHelper cookieHelper;
@@ -70,10 +73,10 @@ public class AuthController {
                 AuthResponse.withoutToken(result));
     }
 
-    @GetMapping("/refresh-token")
+    @PostMapping("/refresh-token")
     public ApiResponse<AuthResponse> refreshToken(HttpServletRequest request,
                                                   HttpServletResponse response) {
-        String rawToken = cookieHelper.extractRefreshToken(request)
+        String rawToken   = cookieHelper.extractRefreshToken(request)
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
         DeviceInfo deviceInfo = deviceContextExtractor.extract(request);
         AuthResponse result   = sessionHandler.handle(new RefreshTokenCommand(rawToken), deviceInfo);
@@ -91,5 +94,22 @@ public class AuthController {
     public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpCommand command) {
         otpHandler.handle(command, SecurityUtils.requireCurrentUserId());
         return ApiResponse.ok("OTP resent successfully, please check your email", null);
+    }
+
+    /**
+     * Logout — thu hồi session theo scope.
+     *
+     * Yêu cầu AT hợp lệ — userId lấy từ SecurityContext.
+     * Idempotent: luôn trả thành công, cookie luôn bị xóa bất kể RT có tồn tại hay không.
+     */
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    @Valid @RequestBody LogoutRequest body) {
+        String rawToken = cookieHelper.extractRefreshToken(request).orElse(null);
+        UserId userId   = SecurityUtils.requireCurrentUserId();
+        logoutHandler.handle(new LogoutCommand(rawToken, body.scope()), userId);
+        cookieHelper.clearRefreshTokenCookie(response);
+        return ApiResponse.ok("Logout successful", null);
     }
 }

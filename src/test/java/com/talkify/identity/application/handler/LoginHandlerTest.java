@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,8 +26,10 @@ import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.identity.application.command.LoginCommand;
 import com.talkify.identity.application.command.SendOtpCommand;
+import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.DevicePlatform;
 import com.talkify.identity.application.service.SessionService;
@@ -52,10 +55,11 @@ class LoginHandlerTest {
 
     @InjectMocks private LoginHandler handler;
 
-    private static final UserId USER_ID = UserId.of(1L);
-    private static final String RAW_PASSWORD = "Abcdef12";
-    private static final String HASHED = "$2a$10$hashed";
-    private static final DeviceInfo DEVICE_INFO = DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1");
+    private static final UserId     USER_ID    = UserId.of(1L);
+    private static final SessionId  SESSION_ID = new SessionId(100L);
+    private static final String     RAW_PASSWORD = "Abcdef12";
+    private static final String     HASHED       = "$2a$10$hashed";
+    private static final DeviceInfo DEVICE_INFO  = DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1");
 
     private User buildUser(UserStatus status) {
         return User.reconstruct(
@@ -79,9 +83,9 @@ class LoginHandlerTest {
             User user = buildUser(UserStatus.ACTIVE);
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(USER_ID, UserRole.USER, UserStatus.ACTIVE))
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "refresh"));
+            when(jwtPort.generateAccessToken(eq(USER_ID), eq(SESSION_ID), eq(UserRole.USER), eq(UserStatus.ACTIVE)))
                     .thenReturn("access");
-            when(sessionService.createSession(any(), any())).thenReturn("refresh");
 
             AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
@@ -97,8 +101,8 @@ class LoginHandlerTest {
             User user = buildUser(UserStatus.ACTIVE);
             when(userRepository.findByUsername(any(Username.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             AuthResponse response = handler.handle(new LoginCommand("testuser", RAW_PASSWORD), DEVICE_INFO);
 
@@ -111,8 +115,8 @@ class LoginHandlerTest {
             User user = buildUser(UserStatus.ACTIVE);
             when(userRepository.findByPhoneNumber(any(PhoneNumber.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             AuthResponse response = handler.handle(new LoginCommand("+84912345678", RAW_PASSWORD), DEVICE_INFO);
 
@@ -125,8 +129,8 @@ class LoginHandlerTest {
             User user = buildUser(UserStatus.ACTIVE);
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
@@ -166,7 +170,7 @@ class LoginHandlerTest {
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
 
-            verify(jwtPort, never()).generateAccessToken(any(), any(), any());
+            verify(jwtPort, never()).generateAccessToken(any(), any(), any(), any());
         }
     }
 
@@ -182,9 +186,9 @@ class LoginHandlerTest {
             User user = buildUser(UserStatus.INACTIVE);
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(USER_ID, UserRole.USER, UserStatus.INACTIVE))
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "refresh"));
+            when(jwtPort.generateAccessToken(eq(USER_ID), eq(SESSION_ID), eq(UserRole.USER), eq(UserStatus.INACTIVE)))
                     .thenReturn("inactive-token");
-            when(sessionService.createSession(any(), any())).thenReturn("refresh");
 
             AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
@@ -205,7 +209,7 @@ class LoginHandlerTest {
                     .extracting(e -> ((AppException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USER_BANNED);
 
-            verify(jwtPort, never()).generateAccessToken(any(), any(), any());
+            verify(jwtPort, never()).generateAccessToken(any(), any(), any(), any());
         }
 
         @Test
@@ -241,7 +245,7 @@ class LoginHandlerTest {
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage("Email service down");
 
-            verify(jwtPort, never()).generateAccessToken(any(), any(), any());
+            verify(jwtPort, never()).generateAccessToken(any(), any(), any(), any());
         }
 
         @Test
@@ -250,7 +254,8 @@ class LoginHandlerTest {
             User user = buildUser(UserStatus.ACTIVE);
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(any(), any(), any()))
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any()))
                     .thenThrow(new RuntimeException("Key not configured"));
 
             assertThatThrownBy(() -> handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO))
@@ -270,8 +275,8 @@ class LoginHandlerTest {
             );
             when(userRepository.findByEmail(any(Email.class))).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(RAW_PASSWORD, HASHED)).thenReturn(true);
-            when(jwtPort.generateAccessToken(any(), any(), any())).thenReturn("t");
-            when(sessionService.createSession(any(), any())).thenReturn("t");
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(SESSION_ID, "t"));
+            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn("t");
 
             AuthResponse response = handler.handle(new LoginCommand("test@gmail.com", RAW_PASSWORD), DEVICE_INFO);
 
