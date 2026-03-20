@@ -70,4 +70,40 @@ public class CacheAdapter implements CachePort {
     public Long getExpire(String key) {
         return redisTemplate.getExpire(key);
     }
+
+    @Override
+    public void hset(String hashKey, String field, String value, Duration ttl) {
+        redisTemplate.opsForHash().put(hashKey, field, value);
+        redisTemplate.expire(hashKey, ttl.toSeconds(), TimeUnit.SECONDS);
+        log.debug("Cache HSET | hashKey={} field={} ttl={}s", hashKey, field, ttl.toSeconds());
+    }
+
+    @Override
+    public Optional<String> hget(String hashKey, String field) {
+        Object value = redisTemplate.opsForHash().get(hashKey, field);
+        return Optional.ofNullable(value != null ? value.toString() : null);
+    }
+
+    @Override
+    public void hdel(String hashKey, String field) {
+        redisTemplate.opsForHash().delete(hashKey, field);
+        log.debug("Cache HDEL | hashKey={} field={}", hashKey, field);
+    }
+
+    @Override
+    public void hdel(String hashKey) {
+        redisTemplate.delete(hashKey);
+        log.debug("Cache HDEL | hashKey={}", hashKey);
+    }
+
+    @Override
+    public void expireIfGreater(String key, Duration ttl) {
+        Long currentTtl = redisTemplate.getExpire(key);
+        if (currentTtl == null || currentTtl < ttl.toSeconds()) {
+            redisTemplate.expire(key, ttl.toSeconds(), TimeUnit.SECONDS);
+            log.debug("Cache EXPIRE | key={} newTtl={}s", key, ttl.toSeconds());
+        } else {
+            log.debug("Cache EXPIRE SKIP | key={} currentTtl={}s >= newTtl={}s", key, currentTtl, ttl.toSeconds());
+        }
+    }
 }

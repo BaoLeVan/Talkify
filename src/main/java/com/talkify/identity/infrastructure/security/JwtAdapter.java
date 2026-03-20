@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import com.talkify.config.security.JwtProperties;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.TokenClaims;
+import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
@@ -37,10 +38,11 @@ public class JwtAdapter implements JwtPort{
     }
 
     @Override
-    public String generateAccessToken(UserId userId, UserRole role, UserStatus status) {
+    public String generateAccessToken(UserId userId, SessionId sessionId, UserRole role, UserStatus status) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId.value()))
+                .claim("sid", sessionId.value())
                 .claim("role", role.name())
                 .claim("type", "access")
                 .claim("status", status.name())
@@ -93,7 +95,8 @@ public class JwtAdapter implements JwtPort{
                 payload.getSubject(),
                 payload.get("type", String.class),
                 payload.get("role", String.class),
-                payload.get("status", String.class)
+                payload.get("status", String.class),
+                SessionId.of(payload.get("sid", Long.class))
         );
     }
 
