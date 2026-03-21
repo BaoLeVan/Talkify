@@ -18,6 +18,7 @@ import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.event.SessionRevokedEvent;
+import com.talkify.identity.domain.event.SessionRotationCompletedEvent;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserSession;
@@ -56,11 +57,9 @@ public class SessionHandler {
             log.warn("Refresh lock contention | tokenHash prefix={}...", tokenHash.substring(0, 8));
             throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
         }
-        try {
-            return doHandle(tokenHash, rawToken, deviceInfo);
-        } finally {
-            cachePort.delete(lockKey);
-        }
+
+        eventPublisher.publishEvent(new SessionRotationCompletedEvent(lockKey));
+        return doHandle(tokenHash, rawToken, deviceInfo);
     }
 
     private AuthResponse doHandle(String tokenHash, String rawToken, DeviceInfo deviceInfo) {
