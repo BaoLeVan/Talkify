@@ -39,6 +39,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX    = "Bearer ";
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
+    private static final String[] SKIP_FILTER_PATHS = {
+            "/api/v1/auth/register",
+            "/api/v1/auth/login",
+            "/api/v1/auth/refresh-token",
+    };
+
     private static final String[] ALLOW_PATHS_FOR_INACTIVE_USER = {
             "/api/v1/auth/send-otp",
             "/api/v1/auth/verify-otp",
@@ -48,6 +54,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtPort      jwtPort;
     private final SessionCachePort sessionCachePort;
     private final ObjectMapper objectMapper;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        for (String skipPath : SKIP_FILTER_PATHS) {
+            if (PATH_MATCHER.match(skipPath, path)) return true;
+        }
+        return false;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
