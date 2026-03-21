@@ -38,6 +38,12 @@ public class SessionRepositoryAdapter implements SessionRepository {
     }
 
     @Override
+    public Optional<UserSession> findById(SessionId sessionId) {
+        return sessionJpaRepository.findById(sessionId.value())
+                .map(this::toDomain);
+    }
+
+    @Override
     public Optional<UserSession> findByTokenHash(String tokenHash) {
         return sessionJpaRepository.findByTokenHash(tokenHash)
                 .map(this::toDomain);
@@ -77,8 +83,8 @@ public class SessionRepositoryAdapter implements SessionRepository {
 
     @Override
     @Transactional
-    public void revokeAllByUserIdExceptTokenHash(UserId userId, String tokenHash) {
-        sessionJpaRepository.revokeAllByUserIdExceptTokenHash(userId.value(), tokenHash, Instant.now());
+    public void revokeAllByUserIdExceptSessionId(UserId userId, SessionId sessionId) {
+        sessionJpaRepository.revokeAllByUserIdExceptSessionId(userId.value(), sessionId.value(), Instant.now());
     }
 
     @Override
@@ -119,5 +125,10 @@ public class SessionRepositoryAdapter implements SessionRepository {
                 entity.getLastUsedAt(),
                 entity.getCreatedAt(),
                 entity.getRevokedAt());
+    }
+
+    @Override
+    public void revokeById(SessionId sessionId) {
+        sessionJpaRepository.revokeById(sessionId.value(), Instant.now());
     }
 }

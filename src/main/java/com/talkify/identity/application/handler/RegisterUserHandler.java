@@ -1,5 +1,8 @@
 package com.talkify.identity.application.handler;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -58,7 +61,7 @@ public class RegisterUserHandler {
 
         userRepository.save(user);
         SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
-        String accessToken = jwtPort.generateAccessToken(
+        String accessToken = jwtPort.issueAccessToken(
                 user.getId(),
                 sessionResult.sessionId(),
                 user.getRole(),

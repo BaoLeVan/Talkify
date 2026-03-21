@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.port.JwtPort;
+import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserSession;
@@ -20,26 +21,16 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SessionService {
 
-    private final JwtPort           jwtPort;
-    private final SessionRepository sessionRepository;
-    private final Clock             clock;
+    private final JwtPort            jwtPort;
+    private final SessionRepository  sessionRepository;
+    private final SessionCachePort   sessionCachePort;
+    private final Clock              clock;
 
-    /**
-     * Tạo session mới và trả về {@link SessionResult} chứa:
-     * <ul>
-     *   <li>{@code sessionId} — để đưa vào AT claim "sid".</li>
-     *   <li>{@code rawRefreshToken} — để set vào HttpOnly cookie qua controller.</li>
-     * </ul>
-     *
-     * <p>Domain chỉ lưu {@code SHA-256(rawRefreshToken)}, raw token không bao giờ
-     * được persist. Caller có trách nhiệm xử lý raw token an toàn (truyền vào
-     * {@code AuthResponse} rồi set cookie, không log).
-     */
     @Transactional
     public SessionResult createSession(UserId userId, DeviceInfo deviceInfo) {
         Instant now           = clock.instant();
-        String rawToken       = jwtPort.generateRefreshToken(userId);
-        Instant expiresAt     = now.plusSeconds(jwtPort.getRefreshTokenTtl());
+        String rawToken       = jwtPort.issueRefreshToken(userId);
+        Instant expiresAt     = now.plusSeconds(jwtPort.refreshTokenTtl());
 
         UserSession session = UserSession.create(
                 userId,
@@ -49,6 +40,7 @@ public class SessionService {
                 now
         );
         sessionRepository.save(session);
-        return new SessionResult(session.getId(), rawToken);
+        sessionCachePort.cacheSession(session.getId(), userId, expiresAt);
+        return new SessionResult(session.getId(), rawToken, expiresAt);
     }
 }

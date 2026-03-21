@@ -1,13 +1,14 @@
 package com.talkify.identity.application.port;
 
-import java.time.Duration;
+import java.time.Instant;
 
 import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
 
 public interface SessionCachePort {
-    void cacheSession(SessionId sessionId, UserId userId, Duration ttl);
-    boolean isSessionValid(SessionId sessionId);
-    void evictSession(SessionId sessionId);
+    void cacheSession(SessionId sessionId, UserId userId, Instant expiresAt);
+    boolean exists(SessionId sessionId, UserId userId);
+    boolean isSessionValid(SessionId sessionId, UserId userId);
+    void evictSession(SessionId sessionId, UserId userId);
     void evictAllSessions(UserId userId);
 }

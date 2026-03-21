@@ -12,8 +12,9 @@ import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.command.RefreshTokenCommand;
 import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
+import com.talkify.identity.application.port.CachePort;
 import com.talkify.identity.application.port.JwtPort;
-import com.talkify.identity.application.port.TokenClaims;
+import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.User;
@@ -24,27 +25,16 @@ import com.talkify.identity.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Xử lý refresh token theo chiến lược Hybrid:
- *
- *  ┌─────────────────────────────────────────────────────────┐
- *  │  remaining TTL > threshold (JWT_REFRESH_THRESHOLD)       │
- *  │   → chỉ cấp access token mới, GIỮ NGUYÊN refresh token  │
- *  ├─────────────────────────────────────────────────────────┤
- *  │  remaining TTL ≤ threshold (gần hết hạn)                 │
- *  │   → rotation: revoke old session, cấp cặp token mới      │
- *  └─────────────────────────────────────────────────────────┘
- *
- *  Reuse attack detection:
- *   Nếu refresh token hợp lệ về chữ ký (JWT) nhưng đã bị revoke trong DB
- *   → ai đó đang dùng token cũ đã bị thu hồi → revoke ALL sessions ngay lập tức.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SessionHandler {
 
+    private static final Duration ROTATION_LOCK_TTL = Duration.ofSeconds(5);
+
+    private final CachePort         cachePort;
     private final JwtPort           jwtPort;
+    private final SessionCachePort  sessionCachePort;
     private final SessionService    sessionService;
     private final SessionRepository sessionRepository;
     private final UserRepository    userRepository;
@@ -52,18 +42,26 @@ public class SessionHandler {
 
     @Transactional
     public AuthResponse handle(RefreshTokenCommand command, DeviceInfo deviceInfo) {
-        String rawToken = command.refreshToken();
-
-        if (!jwtPort.validateToken(rawToken)) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        }
-
-        TokenClaims claims = jwtPort.extractAllClaims(rawToken);
-        if (!"refresh".equals(claims.type())) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        }
-
+        String rawToken  = command.refreshToken();
         String tokenHash = Sha256Utils.hash(rawToken);
+
+        if (!jwtPort.validateRefreshToken(rawToken)) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+
+        String lockKey = "lock:refresh:" + tokenHash;
+        if (!cachePort.setIfAbsent(lockKey, "1", ROTATION_LOCK_TTL)) {
+            log.warn("Refresh lock contention | tokenHash prefix={}...", tokenHash.substring(0, 8));
+            throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
+        }
+        try {
+            return doHandle(tokenHash, rawToken, deviceInfo);
+        } finally {
+            cachePort.delete(lockKey);
+        }
+    }
+
+    private AuthResponse doHandle(String tokenHash, String rawToken, DeviceInfo deviceInfo) {
         UserSession session = sessionRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new AppException(ErrorCode.SESSION_NOT_FOUND));
 
@@ -85,30 +83,37 @@ public class SessionHandler {
 
         long remainingSeconds = Duration.between(clock.instant(), session.getExpiresAt()).getSeconds();
 
-        if (remainingSeconds > jwtPort.getRefreshThreshold()) {
-            // Reactive renewal: giữ RT cũ, chỉ cấp AT mới với sessionId hiện tại
-            session.markUsed();
-            sessionRepository.save(session);
-
-            String newAccessToken = jwtPort.generateAccessToken(
-                    user.getId(), session.getId(), user.getRole(), user.getStatus());
-
-            log.debug("Access token renewed | userId={} remainingTtl={}s",
-                    user.getId().value(), remainingSeconds);
-            return AuthResponse.of(newAccessToken, rawToken, null);
-
+        if (remainingSeconds > jwtPort.refreshThreshold()) {
+            return handleReactiveRenewal(session, user, remainingSeconds, rawToken);
         } else {
-            // Proactive rotation: revoke session cũ, tạo session mới
-            sessionRepository.revokeByTokenHash(tokenHash);
-
-            SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
-            String newAccessToken = jwtPort.generateAccessToken(
-                    user.getId(), sessionResult.sessionId(), user.getRole(), user.getStatus());
-
-            log.info("Refresh token rotated | userId={} remainingTtl={}s",
-                    user.getId().value(), remainingSeconds);
-            return AuthResponse.of(newAccessToken, sessionResult.rawRefreshToken(), null);
+            return handleProactiveRotation(session, user, tokenHash, deviceInfo);
         }
+    }
+
+    private AuthResponse handleReactiveRenewal(UserSession session, User user,
+                                               long remainingSeconds, String rawToken) {
+        session.markUsed();
+        sessionRepository.save(session);
+
+        String newAccessToken = jwtPort.issueAccessToken(
+                user.getId(), session.getId(), user.getRole(), user.getStatus());
+
+        log.debug("Access token renewed | userId={} remainingTtl={}s",
+                user.getId().value(), remainingSeconds);
+        return AuthResponse.of(newAccessToken, rawToken, null);
+    }
+
+    private AuthResponse handleProactiveRotation(UserSession session, User user,
+                                                 String tokenHash, DeviceInfo deviceInfo) {
+        sessionRepository.revokeByTokenHash(tokenHash);
+        sessionCachePort.evictSession(session.getId(), user.getId());
+
+        SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
+        String newAccessToken = jwtPort.issueAccessToken(
+                user.getId(), sessionResult.sessionId(), user.getRole(), user.getStatus());
+
+        log.info("Refresh token rotated | userId={}", user.getId().value());
+        return AuthResponse.of(newAccessToken, sessionResult.rawRefreshToken(), null);
     }
 }
 

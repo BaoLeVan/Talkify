@@ -30,8 +30,9 @@ import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.command.RefreshTokenCommand;
 import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
+import com.talkify.identity.application.port.CachePort;
 import com.talkify.identity.application.port.JwtPort;
-import com.talkify.identity.application.port.TokenClaims;
+import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.DevicePlatform;
@@ -50,11 +51,13 @@ import com.talkify.identity.domain.repository.UserRepository;
 @DisplayName("SessionHandler — Refresh Token")
 class SessionHandlerTest {
 
-    @Mock private JwtPort jwtPort;
-    @Mock private SessionService sessionService;
+    @Mock private CachePort        cachePort;
+    @Mock private JwtPort           jwtPort;
+    @Mock private SessionCachePort  sessionCachePort;
+    @Mock private SessionService    sessionService;
     @Mock private SessionRepository sessionRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private Clock clock;
+    @Mock private UserRepository    userRepository;
+    @Mock private Clock             clock;
 
     @InjectMocks private SessionHandler handler;
 
@@ -69,11 +72,6 @@ class SessionHandlerTest {
     private static final String HASHED_PW      = "$2a$10$hashed";
     private static final DeviceInfo DEVICE_INFO  = DeviceInfo.of("Chrome on macOS", DevicePlatform.WEB, "203.0.113.1");
 
-    private static final TokenClaims REFRESH_CLAIMS = new TokenClaims(
-            "1", "refresh", null, null, null);
-    private static final TokenClaims ACCESS_CLAIMS = new TokenClaims(
-            "1", "access", "USER", "ACTIVE", null);
-
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private RefreshTokenCommand command() {
@@ -86,6 +84,8 @@ class SessionHandlerTest {
         // lenient() because early-fail tests (invalid JWT, revoked session, etc.) throw
         // before reaching the clock.instant() call — strict stubbing would flag them.
         lenient().when(clock.instant()).thenReturn(FIXED_NOW);
+        // Always acquire distributed lock — tests focus on business logic, not lock contention.
+        lenient().when(cachePort.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
     }
 
     private User buildUser(UserStatus status) {
@@ -139,12 +139,12 @@ class SessionHandlerTest {
     }
 
     private void stubJwtValid() {
-        when(jwtPort.validateToken(RAW_TOKEN)).thenReturn(true);
-        when(jwtPort.extractAllClaims(RAW_TOKEN)).thenReturn(REFRESH_CLAIMS);
+        // validateRefreshToken = 1 pass: signature + not expired + type="refresh"
+        when(jwtPort.validateRefreshToken(RAW_TOKEN)).thenReturn(true);
     }
 
     private void stubThreshold() {
-        when(jwtPort.getRefreshThreshold()).thenReturn(THRESHOLD);
+        when(jwtPort.refreshThreshold()).thenReturn(THRESHOLD);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -158,7 +158,7 @@ class SessionHandlerTest {
         @Test
         @DisplayName("should throw INVALID_TOKEN when JWT signature is invalid")
         void invalidSignature() {
-            when(jwtPort.validateToken(RAW_TOKEN)).thenReturn(false);
+            when(jwtPort.validateRefreshToken(RAW_TOKEN)).thenReturn(false);
 
             assertThatThrownBy(() -> handler.handle(command(), DEVICE_INFO))
                     .isInstanceOf(AppException.class)
@@ -170,8 +170,8 @@ class SessionHandlerTest {
         @Test
         @DisplayName("should throw INVALID_TOKEN when token type is not 'refresh'")
         void wrongTokenType() {
-            when(jwtPort.validateToken(RAW_TOKEN)).thenReturn(true);
-            when(jwtPort.extractAllClaims(RAW_TOKEN)).thenReturn(ACCESS_CLAIMS);
+            // validateRefreshToken bao gồm cả type check — trả false khi type != "refresh"
+            when(jwtPort.validateRefreshToken(RAW_TOKEN)).thenReturn(false);
 
             assertThatThrownBy(() -> handler.handle(command(), DEVICE_INFO))
                     .isInstanceOf(AppException.class)
@@ -294,7 +294,7 @@ class SessionHandlerTest {
                     .thenReturn(Optional.of(session));
             when(userRepository.findById(USER_ID.value()))
                     .thenReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
-            when(jwtPort.generateAccessToken(eq(USER_ID), any(SessionId.class), eq(UserRole.USER), eq(UserStatus.ACTIVE)))
+            when(jwtPort.issueAccessToken(eq(USER_ID), any(SessionId.class), eq(UserRole.USER), eq(UserStatus.ACTIVE)))
                     .thenReturn(NEW_ACCESS);
             stubThreshold();
             when(sessionRepository.save(any(UserSession.class))).thenReturn(session);
@@ -305,7 +305,7 @@ class SessionHandlerTest {
             assertThat(response.refreshToken()).isEqualTo(RAW_TOKEN); // unchanged
             verify(sessionRepository).save(session);
             verify(sessionRepository, never()).revokeByTokenHash(anyString());
-            verify(jwtPort, never()).generateRefreshToken(any());
+            verify(jwtPort, never()).issueRefreshToken(any());
         }
 
         @Test
@@ -317,7 +317,7 @@ class SessionHandlerTest {
                     .thenReturn(Optional.of(session));
             when(userRepository.findById(USER_ID.value()))
                     .thenReturn(Optional.of(buildUser(UserStatus.INACTIVE)));
-            when(jwtPort.generateAccessToken(eq(USER_ID), any(SessionId.class), eq(UserRole.USER), eq(UserStatus.INACTIVE)))
+            when(jwtPort.issueAccessToken(eq(USER_ID), any(SessionId.class), eq(UserRole.USER), eq(UserStatus.INACTIVE)))
                     .thenReturn(NEW_ACCESS);
             stubThreshold();
             when(sessionRepository.save(any(UserSession.class))).thenReturn(session);
@@ -345,8 +345,8 @@ class SessionHandlerTest {
                     .thenReturn(Optional.of(nearExpirySession()));
             when(userRepository.findById(USER_ID.value()))
                     .thenReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
-            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(new SessionId(999L), NEW_REFRESH));
-            when(jwtPort.generateAccessToken(eq(USER_ID), any(SessionId.class), eq(UserRole.USER), eq(UserStatus.ACTIVE)))
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(new SessionId(999L), NEW_REFRESH, FIXED_NOW.plusSeconds(604800)));
+            when(jwtPort.issueAccessToken(eq(USER_ID), any(SessionId.class), eq(UserRole.USER), eq(UserStatus.ACTIVE)))
                     .thenReturn(NEW_ACCESS);
             stubThreshold();
 
@@ -366,8 +366,8 @@ class SessionHandlerTest {
                     .thenReturn(Optional.of(nearExpirySession()));
             when(userRepository.findById(USER_ID.value()))
                     .thenReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
-            when(sessionService.createSession(any(), eq(DEVICE_INFO))).thenReturn(new SessionResult(new SessionId(999L), NEW_REFRESH));
-            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn(NEW_ACCESS);
+            when(sessionService.createSession(any(), eq(DEVICE_INFO))).thenReturn(new SessionResult(new SessionId(999L), NEW_REFRESH, FIXED_NOW.plusSeconds(604800)));
+            when(jwtPort.issueAccessToken(any(), any(), any(), any())).thenReturn(NEW_ACCESS);
             stubThreshold();
 
             AuthResponse response = handler.handle(command(), DEVICE_INFO);
@@ -400,8 +400,8 @@ class SessionHandlerTest {
                     .thenReturn(Optional.of(session));
             when(userRepository.findById(USER_ID.value()))
                     .thenReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
-            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(new SessionId(999L), NEW_REFRESH));
-            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn(NEW_ACCESS);
+            when(sessionService.createSession(any(), any())).thenReturn(new SessionResult(new SessionId(999L), NEW_REFRESH, FIXED_NOW.plusSeconds(604800)));
+            when(jwtPort.issueAccessToken(any(), any(), any(), any())).thenReturn(NEW_ACCESS);
             stubThreshold();
 
             AuthResponse response = handler.handle(command(), DEVICE_INFO);
@@ -424,7 +424,7 @@ class SessionHandlerTest {
                     .thenReturn(Optional.of(session));
             when(userRepository.findById(USER_ID.value()))
                     .thenReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
-            when(jwtPort.generateAccessToken(any(), any(), any(), any())).thenReturn(NEW_ACCESS);
+            when(jwtPort.issueAccessToken(any(), any(), any(), any())).thenReturn(NEW_ACCESS);
             stubThreshold();
             when(sessionRepository.save(any(UserSession.class))).thenReturn(session);
 
