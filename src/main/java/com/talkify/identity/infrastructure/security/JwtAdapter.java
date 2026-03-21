@@ -17,7 +17,10 @@ import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
 
+import java.util.Optional;
+
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -77,19 +80,36 @@ public class JwtAdapter implements JwtPort{
     public TokenParseResult parseAccessToken(String token) {
         try {
             Claims payload = parseClaims(token).getPayload();
-            TokenClaims claims = new TokenClaims(
-                    payload.getSubject(),
-                    payload.get("type", String.class),
-                    payload.get("role", String.class),
-                    payload.get("status", String.class),
-                    SessionId.of(payload.get("sid", Long.class))
-            );
-            return new TokenParseResult.Valid(claims);
-        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return new TokenParseResult.Valid(buildTokenClaims(payload));
+        } catch (ExpiredJwtException e) {
             return new TokenParseResult.Expired();
         } catch (Exception e) {
             log.warn("Invalid access token: {}", e.getMessage());
             return new TokenParseResult.Invalid();
+        }
+    }
+
+    private TokenClaims buildTokenClaims(Claims payload) {
+        return new TokenClaims(
+                payload.getSubject(),
+                payload.get("type", String.class),
+                payload.get("role", String.class),
+                payload.get("status", String.class),
+                SessionId.of(payload.get("sid", Long.class))
+        );
+    }
+
+    @Override
+    public Optional<TokenClaims> extractClaimsIgnoreExpiry(String token) {
+        try {
+            Claims payload = parseClaims(token).getPayload();
+            return Optional.of(buildTokenClaims(payload));
+        } catch (ExpiredJwtException e) {
+            // Token hết hạn nhưng signature hợp lệ — claims vẫn đáng tin cậy
+            return Optional.of(buildTokenClaims(e.getClaims()));
+        } catch (Exception e) {
+            log.warn("Cannot extract claims from token: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 
