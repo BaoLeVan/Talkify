@@ -43,7 +43,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/v1/auth/register",
             "/api/v1/auth/login",
             "/api/v1/auth/refresh-token",
-            "/api/v1/auth/logout",
     };
 
     private static final String[] ALLOW_PATHS_FOR_INACTIVE_USER = {
