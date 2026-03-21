@@ -22,6 +22,7 @@ import com.talkify.identity.application.handler.LogoutHandler;
 import com.talkify.identity.application.handler.OtpHandler;
 import com.talkify.identity.application.handler.RegisterUserHandler;
 import com.talkify.identity.application.handler.SessionHandler;
+import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
@@ -44,6 +45,7 @@ public class AuthController {
     private final OtpHandler               otpHandler;
     private final DeviceContextExtractor   deviceContextExtractor;
     private final RefreshTokenCookieHelper cookieHelper;
+    private final JwtPort                  jwtPort;
 
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginCommand command,
@@ -93,10 +95,27 @@ public class AuthController {
     public ApiResponse<Void> logout(HttpServletRequest request,
                                     HttpServletResponse response,
                                     @Valid @RequestBody LogoutRequest body) {
-        UserId userId    = SecurityUtils.requireCurrentUserId();
-        SessionId sessionId = SecurityUtils.requireCurrentSessionId();
-        logoutHandler.handle(new LogoutCommand(sessionId, body.scope()), userId);
         cookieHelper.clearRefreshTokenCookie(response);
+
+        String rawToken = extractBearerToken(request);
+        if (rawToken == null) {
+            return ApiResponse.ok("Logout successful", null);
+        }
+
+        jwtPort.extractClaimsIgnoreExpiry(rawToken).ifPresent(claims -> {
+            UserId    userId    = UserId.of(Long.parseLong(claims.subject()));
+            SessionId sessionId = claims.sessionId();
+            logoutHandler.handle(new LogoutCommand(sessionId, body.scope()), userId);
+        });
+
         return ApiResponse.ok("Logout successful", null);
+    }
+
+    private String extractBearerToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
     }
 }

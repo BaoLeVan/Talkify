@@ -24,6 +24,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.util.Sha256Utils;
@@ -32,7 +34,6 @@ import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.dto.response.AuthResponse;
 import com.talkify.identity.application.port.CachePort;
 import com.talkify.identity.application.port.JwtPort;
-import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.DevicePlatform;
@@ -51,9 +52,9 @@ import com.talkify.identity.domain.repository.UserRepository;
 @DisplayName("SessionHandler — Refresh Token")
 class SessionHandlerTest {
 
+    @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private CachePort        cachePort;
     @Mock private JwtPort           jwtPort;
-    @Mock private SessionCachePort  sessionCachePort;
     @Mock private SessionService    sessionService;
     @Mock private SessionRepository sessionRepository;
     @Mock private UserRepository    userRepository;
