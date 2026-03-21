@@ -20,6 +20,11 @@ public interface SessionJpaRepository extends JpaRepository<SessionJpaEntity, Lo
 
     @Modifying
     @Query("UPDATE SessionJpaEntity s SET s.revokedAt = :now " +
+           "WHERE s.id = :id AND s.revokedAt IS NULL")
+    void revokeById(@Param("id") Long id, @Param("now") Instant now);
+
+    @Modifying
+    @Query("UPDATE SessionJpaEntity s SET s.revokedAt = :now " +
            "WHERE s.tokenHash = :tokenHash AND s.revokedAt IS NULL")
     void revokeByTokenHash(@Param("tokenHash") String tokenHash,
                            @Param("now") Instant now);
@@ -43,8 +48,8 @@ public interface SessionJpaRepository extends JpaRepository<SessionJpaEntity, Lo
 
     @Modifying
     @Query("UPDATE SessionJpaEntity s SET s.revokedAt = :now " +
-           "WHERE s.userId = :userId AND s.tokenHash <> :tokenHash AND s.revokedAt IS NULL")
-    void revokeAllByUserIdExceptTokenHash(@Param("userId") Long userId,
-                                         @Param("tokenHash") String tokenHash,
+           "WHERE s.userId = :userId AND s.id <> :sessionId AND s.revokedAt IS NULL")
+    void revokeAllByUserIdExceptSessionId(@Param("userId") Long userId,
+                                         @Param("sessionId") Long sessionId,
                                          @Param("now") Instant now);
 }

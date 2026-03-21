@@ -2,43 +2,57 @@ package com.talkify.identity.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+
+import java.time.Instant;
+import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.command.LogoutCommand;
+import com.talkify.identity.application.port.SessionCachePort;
+import com.talkify.identity.domain.model.DeviceInfo;
+import com.talkify.identity.domain.model.DevicePlatform;
 import com.talkify.identity.domain.model.LogoutScope;
+import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
+import com.talkify.identity.domain.model.UserSession;
 import com.talkify.identity.domain.repository.SessionRepository;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LogoutHandler")
 class LogoutHandlerTest {
 
-    @Mock  private SessionRepository sessionRepository;
+    @Mock private SessionRepository sessionRepository;
+    @Mock private SessionCachePort  sessionCachePort;
     @InjectMocks private LogoutHandler handler;
 
-    // ── Constants ────────────────────────────────────────────────────────────
-    private static final UserId USER_ID   = UserId.of(1L);
-    private static final String RAW_TOKEN = "valid-raw-refresh-token";
-    private static final String TOKEN_HASH = Sha256Utils.hash(RAW_TOKEN);
+    private static final UserId    USER_ID    = UserId.of(1L);
+    private static final SessionId SESSION_ID = SessionId.of(100L);
+    private static final Instant   EXPIRES_AT = Instant.now().plusSeconds(604800);
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    private LogoutCommand command(String rawToken, LogoutScope scope) {
-        return new LogoutCommand(rawToken, scope);
+    private LogoutCommand command(LogoutScope scope) {
+        return new LogoutCommand(SESSION_ID, scope);
+    }
+
+    private UserSession fakeSession() {
+        return UserSession.reconstruct(
+                SESSION_ID, USER_ID, "tokenHash",
+                DeviceInfo.ofUnknown(DevicePlatform.WEB, "127.0.0.1"),
+                EXPIRES_AT, Instant.now(), Instant.now(), null);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -50,66 +64,68 @@ class LogoutHandlerTest {
     class CurrentSessionOnly {
 
         @Test
-        @DisplayName("should revoke only the current session by token hash")
-        void happyPath_revokesCurrentSession() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+        @DisplayName("should revoke session in DB then evict from cache")
+        void happyPath() {
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
 
-            verify(sessionRepository).revokeByTokenHash(TOKEN_HASH);
-            verify(sessionRepository, never()).revokeAllByUserId(any());
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(any(), anyString());
+            verify(sessionRepository).revokeById(SESSION_ID);
+            verify(sessionCachePort).evictSession(SESSION_ID, USER_ID);
         }
 
         @Test
-        @DisplayName("should hash the raw token before passing to repository")
-        void hashesTokenBeforePersistence() {
-            // Verify the adapter never sees raw token — only its SHA-256 hash
-            handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+        @DisplayName("DB revoked before cache evicted — correct order to avoid stale cache on rollback")
+        void dbBeforeCache() {
+            InOrder order = inOrder(sessionRepository, sessionCachePort);
 
-            verify(sessionRepository).revokeByTokenHash(eq(TOKEN_HASH));
-            verify(sessionRepository, never()).revokeByTokenHash(eq(RAW_TOKEN));
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+
+            order.verify(sessionRepository).revokeById(SESSION_ID);
+            order.verify(sessionCachePort).evictSession(SESSION_ID, USER_ID);
         }
 
         @Test
-        @DisplayName("should be idempotent when RT cookie is absent (null)")
-        void noToken_null_doesNothing() {
-            handler.handle(command(null, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-
-            verifyNoInteractions(sessionRepository);
-        }
-
-        @Test
-        @DisplayName("should be idempotent when RT cookie is empty string")
-        void noToken_emptyString_doesNothing() {
-            handler.handle(command("", LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-
-            verifyNoInteractions(sessionRepository);
-        }
-
-        @Test
-        @DisplayName("should be idempotent when RT cookie is whitespace-only")
-        void noToken_whitespace_doesNothing() {
-            handler.handle(command("   ", LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-
-            verifyNoInteractions(sessionRepository);
-        }
-
-        @Test
-        @DisplayName("should NOT throw even if session was already revoked before (idempotent)")
-        void alreadyRevoked_doesNotThrow() {
-            // Repository's revokeByTokenHash is a no-op for already-revoked sessions
-            // → handler must not throw regardless
-            assertThatCode(() ->
-                handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID)
-            ).doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("should NOT use userId for CURRENT_SESSION_ONLY — avoids over-revoke")
-        void doesNotUseUserId() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+        @DisplayName("should NOT touch other sessions — no allSessions methods")
+        void doesNotAffectOtherSessions() {
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
 
             verify(sessionRepository, never()).revokeAllByUserId(any());
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(any(), anyString());
+            verify(sessionRepository, never()).revokeAllByUserIdExceptSessionId(any(), any());
+            verify(sessionCachePort, never()).evictAllSessions(any());
+        }
+
+        @Test
+        @DisplayName("should be idempotent — calling twice does not throw")
+        void idempotent() {
+            assertThatCode(() -> {
+                handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+                handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+            }).doesNotThrowAnyException();
+
+            verify(sessionRepository, times(2)).revokeById(SESSION_ID);
+            verify(sessionCachePort, times(2)).evictSession(SESSION_ID, USER_ID);
+        }
+
+        @Test
+        @DisplayName("should revoke exactly SESSION_ID — not another session")
+        void scopedToSessionId() {
+            SessionId otherSession = SessionId.of(999L);
+
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+
+            verify(sessionRepository).revokeById(SESSION_ID);
+            verify(sessionRepository, never()).revokeById(otherSession);
+            verify(sessionCachePort).evictSession(SESSION_ID, USER_ID);
+            verify(sessionCachePort, never()).evictSession(eq(otherSession), any());
+        }
+
+        @Test
+        @DisplayName("exactly two operations — revokeById + evictSession, nothing more")
+        void exactlyTwoOperations() {
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+
+            verify(sessionRepository).revokeById(SESSION_ID);
+            verify(sessionCachePort).evictSession(SESSION_ID, USER_ID);
+            verifyNoMoreInteractions(sessionRepository, sessionCachePort);
         }
     }
 
@@ -122,66 +138,79 @@ class LogoutHandlerTest {
     class AllExceptCurrent {
 
         @Test
-        @DisplayName("should revoke all sessions except the current one")
-        void happyPath_revokesAllExceptCurrent() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+        @DisplayName("happy path — revoke others in DB, evict all cache, re-cache current")
+        void happyPath_sessionExists() {
+            when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(fakeSession()));
 
-            verify(sessionRepository).revokeAllByUserIdExceptTokenHash(USER_ID, TOKEN_HASH);
-            verify(sessionRepository, never()).revokeAllByUserId(any());
-            verify(sessionRepository, never()).revokeByTokenHash(anyString());
+            handler.handle(command(LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+
+            verify(sessionRepository).revokeAllByUserIdExceptSessionId(USER_ID, SESSION_ID);
+            verify(sessionCachePort).evictAllSessions(USER_ID);
+            verify(sessionCachePort).cacheSession(SESSION_ID, USER_ID, EXPIRES_AT);
         }
 
         @Test
-        @DisplayName("should pass hashed token (not raw) to repository")
-        void hashesToken() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+        @DisplayName("should ALWAYS evict all from cache even when current session missing in DB")
+        void evictsAllEvenIfCurrentSessionMissing() {
+            when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.empty());
 
-            verify(sessionRepository).revokeAllByUserIdExceptTokenHash(eq(USER_ID), eq(TOKEN_HASH));
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(any(), eq(RAW_TOKEN));
+            handler.handle(command(LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+
+            verify(sessionCachePort).evictAllSessions(USER_ID);
+            // cannot re-cache without expiresAt data
+            verify(sessionCachePort, never()).cacheSession(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should degrade to ALL_SESSIONS when RT cookie is absent (null)")
-        void noToken_null_degradesToAllSessions() {
-            handler.handle(command(null, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+        @DisplayName("findById query before evictAll — minimizes window where current session is absent from cache")
+        void findByIdBeforeEvict() {
+            when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(fakeSession()));
 
-            verify(sessionRepository).revokeAllByUserId(USER_ID);
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(any(), anyString());
+            InOrder dbOrder    = inOrder(sessionRepository);
+            InOrder cacheOrder = inOrder(sessionCachePort);
+
+            handler.handle(command(LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+
+            dbOrder.verify(sessionRepository).revokeAllByUserIdExceptSessionId(USER_ID, SESSION_ID);
+            dbOrder.verify(sessionRepository).findById(SESSION_ID);
+            cacheOrder.verify(sessionCachePort).evictAllSessions(USER_ID);
+            cacheOrder.verify(sessionCachePort).cacheSession(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should degrade to ALL_SESSIONS when RT cookie is empty string")
-        void noToken_emptyString_degradesToAllSessions() {
-            handler.handle(command("", LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserId(USER_ID);
-        }
-
-        @Test
-        @DisplayName("should degrade to ALL_SESSIONS when RT cookie is whitespace-only")
-        void noToken_whitespace_degradesToAllSessions() {
-            handler.handle(command("   ", LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserId(USER_ID);
-        }
-
-        @Test
-        @DisplayName("should NOT revoke the current session when has token")
+        @DisplayName("should NOT revoke the current session in DB")
         void doesNotRevokeCurrentSession() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+            when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(fakeSession()));
 
-            verify(sessionRepository, never()).revokeByTokenHash(anyString());
+            handler.handle(command(LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+
+            verify(sessionRepository, never()).revokeById(any());
+            verify(sessionRepository, never()).revokeAllByUserId(any());
         }
 
         @Test
-        @DisplayName("should scope revoke to correct userId — wrong user cannot be affected")
+        @DisplayName("should scope revoke to correct userId only")
         void scopedToCorrectUserId() {
-            UserId otherUserId = UserId.of(999L);
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+            UserId other = UserId.of(999L);
+            when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(fakeSession()));
 
-            // Only USER_ID was used, never otherUserId
-            verify(sessionRepository).revokeAllByUserIdExceptTokenHash(eq(USER_ID), anyString());
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(eq(otherUserId), anyString());
+            handler.handle(command(LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+
+            verify(sessionRepository).revokeAllByUserIdExceptSessionId(eq(USER_ID), eq(SESSION_ID));
+            verify(sessionRepository, never()).revokeAllByUserIdExceptSessionId(eq(other), any());
+            verify(sessionCachePort).evictAllSessions(USER_ID);
+            verify(sessionCachePort, never()).evictAllSessions(other);
+        }
+
+        @Test
+        @DisplayName("re-cached session uses expiresAt from DB — not from AT claim")
+        void reusesExpiresAtFromDb() {
+            when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(fakeSession()));
+
+            handler.handle(command(LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
+
+            // EXPIRES_AT matches fakeSession().getExpiresAt()
+            verify(sessionCachePort).cacheSession(SESSION_ID, USER_ID, EXPIRES_AT);
         }
     }
 
@@ -194,181 +223,106 @@ class LogoutHandlerTest {
     class AllSessions {
 
         @Test
-        @DisplayName("should revoke all sessions — RT cookie not required")
-        void happyPath_revokesAll() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_SESSIONS), USER_ID);
+        @DisplayName("should revoke all in DB and evict all from cache")
+        void happyPath() {
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
 
             verify(sessionRepository).revokeAllByUserId(USER_ID);
-            verify(sessionRepository, never()).revokeByTokenHash(anyString());
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(any(), anyString());
+            verify(sessionCachePort).evictAllSessions(USER_ID);
         }
 
         @Test
-        @DisplayName("should revoke all sessions even when RT cookie is absent")
-        void noToken_stillRevokesAll() {
-            handler.handle(command(null, LogoutScope.ALL_SESSIONS), USER_ID);
+        @DisplayName("DB revoked before cache evicted — correct order")
+        void dbBeforeCache() {
+            InOrder order = inOrder(sessionRepository, sessionCachePort);
+
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
+
+            order.verify(sessionRepository).revokeAllByUserId(USER_ID);
+            order.verify(sessionCachePort).evictAllSessions(USER_ID);
+        }
+
+        @Test
+        @DisplayName("should NOT call per-session methods")
+        void doesNotUseIndividualMethods() {
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
+
+            verify(sessionRepository, never()).revokeById(any());
+            verify(sessionCachePort, never()).evictSession(any(), any());
+            verify(sessionCachePort, never()).cacheSession(any(), any(), any());
+            verify(sessionRepository, never()).findById(any());
+        }
+
+        @Test
+        @DisplayName("should scope to correct userId — cannot revoke another user's sessions")
+        void scopedToCorrectUser() {
+            UserId victim = UserId.of(7L);
+
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
 
             verify(sessionRepository).revokeAllByUserId(USER_ID);
+            verify(sessionRepository, never()).revokeAllByUserId(victim);
+            verify(sessionCachePort).evictAllSessions(USER_ID);
+            verify(sessionCachePort, never()).evictAllSessions(victim);
         }
 
         @Test
-        @DisplayName("should revoke all sessions when RT is empty string")
-        void emptyToken_stillRevokesAll() {
-            handler.handle(command("", LogoutScope.ALL_SESSIONS), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserId(USER_ID);
-        }
-
-        @Test
-        @DisplayName("should scope revoke to the correct userId")
-        void scopedToCorrectUserId() {
-            UserId anotherUser = UserId.of(42L);
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_SESSIONS), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserId(USER_ID);
-            verify(sessionRepository, never()).revokeAllByUserId(anotherUser);
-        }
-
-        @Test
-        @DisplayName("should not care about token hash — does not compute hash for ALL_SESSIONS")
-        void doesNotUseTokenHash() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_SESSIONS), USER_ID);
-
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(any(), anyString());
-            verify(sessionRepository, never()).revokeByTokenHash(anyString());
-        }
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    //  4. Idempotency — double logout / already-revoked
-    // ═════════════════════════════════════════════════════════════════════════
-
-    @Nested
-    @DisplayName("Idempotency")
-    class Idempotency {
-
-        @Test
-        @DisplayName("calling logout twice with CURRENT_SESSION_ONLY should not throw")
-        void doubleLogout_currentOnly_noException() {
+        @DisplayName("calling twice should not throw — idempotent")
+        void idempotent() {
             assertThatCode(() -> {
-                handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-                handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+                handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
+                handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
             }).doesNotThrowAnyException();
 
-            // Repository called twice — both calls are safe at DB level (revoked_at already set)
-            verify(sessionRepository, times(2)).revokeByTokenHash(TOKEN_HASH);
+            verify(sessionRepository, times(2)).revokeAllByUserId(USER_ID);
+            verify(sessionCachePort, times(2)).evictAllSessions(USER_ID);
         }
 
         @Test
-        @DisplayName("calling logout twice with ALL_SESSIONS should not throw")
-        void doubleLogout_allSessions_noException() {
-            assertThatCode(() -> {
-                handler.handle(command(null, LogoutScope.ALL_SESSIONS), USER_ID);
-                handler.handle(command(null, LogoutScope.ALL_SESSIONS), USER_ID);
-            }).doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("logout with no cookie should always succeed without any repo call — CURRENT_ONLY")
-        void noCookie_currentOnly_noRepoInteraction() {
-            assertThatCode(() ->
-                handler.handle(command(null, LogoutScope.CURRENT_SESSION_ONLY), USER_ID)
-            ).doesNotThrowAnyException();
-
-            verifyNoInteractions(sessionRepository);
-        }
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    //  5. Security — token isolation
-    // ═════════════════════════════════════════════════════════════════════════
-
-    @Nested
-    @DisplayName("Security — token isolation")
-    class TokenIsolation {
-
-        @Test
-        @DisplayName("two different tokens produce different hashes — sessions are isolated")
-        void differentTokens_differentHashes() {
-            String token1 = "token-device-A";
-            String token2 = "token-device-B";
-
-            handler.handle(command(token1, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-            handler.handle(command(token2, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-
-            verify(sessionRepository).revokeByTokenHash(Sha256Utils.hash(token1));
-            verify(sessionRepository).revokeByTokenHash(Sha256Utils.hash(token2));
-            // Ensure hashes are indeed different
-            verify(sessionRepository, never()).revokeByTokenHash(token1); // raw never passed
-            verify(sessionRepository, never()).revokeByTokenHash(token2); // raw never passed
-        }
-
-        @Test
-        @DisplayName("ALL_EXCEPT_CURRENT uses userId from parameter — not from token claims")
-        void userIdComesfromParameter_notTokenClaims() {
-            UserId correctUser = UserId.of(10L);
-            UserId wrongUser   = UserId.of(99L);
-
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_EXCEPT_CURRENT), correctUser);
-
-            verify(sessionRepository).revokeAllByUserIdExceptTokenHash(eq(correctUser), anyString());
-            verify(sessionRepository, never()).revokeAllByUserIdExceptTokenHash(eq(wrongUser), anyString());
-        }
-
-        @Test
-        @DisplayName("ALL_SESSIONS uses userId from parameter — cannot revoke another user's sessions")
-        void allSessions_onlyRevokesCorrectUser() {
-            UserId victimUser = UserId.of(7L);
-
-            handler.handle(command(null, LogoutScope.ALL_SESSIONS), USER_ID);
+        @DisplayName("exactly two operations — revokeAllByUserId + evictAllSessions, nothing more")
+        void exactlyTwoOperations() {
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
 
             verify(sessionRepository).revokeAllByUserId(USER_ID);
-            verify(sessionRepository, never()).revokeAllByUserId(victimUser);
+            verify(sessionCachePort).evictAllSessions(USER_ID);
+            verifyNoMoreInteractions(sessionRepository, sessionCachePort);
         }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  6. Repository method exclusivity — no cross-calls
+    //  4. Scope isolation — no cross-contamination between scopes
     // ═════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("Repository method exclusivity")
-    class RepositoryExclusivity {
+    @DisplayName("Scope isolation")
+    class ScopeIsolation {
 
         @Test
-        @DisplayName("CURRENT_SESSION_ONLY calls exactly one repo method")
-        void currentOnly_exactlyOneRepoMethod() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
-
-            verify(sessionRepository).revokeByTokenHash(anyString());
-            verifyNoMoreInteractions(sessionRepository);
+        @DisplayName("CURRENT_SESSION_ONLY never calls revokeAllByUserId")
+        void currentOnly_neverRevokesAll() {
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+            verify(sessionRepository, never()).revokeAllByUserId(any());
         }
 
         @Test
-        @DisplayName("ALL_EXCEPT_CURRENT (with token) calls exactly one repo method")
-        void allExceptCurrent_withToken_exactlyOneRepoMethod() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserIdExceptTokenHash(any(), anyString());
-            verifyNoMoreInteractions(sessionRepository);
+        @DisplayName("ALL_SESSIONS never calls revokeById")
+        void allSessions_neverRevokesById() {
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
+            verify(sessionRepository, never()).revokeById(any());
         }
 
         @Test
-        @DisplayName("ALL_EXCEPT_CURRENT (without token) calls exactly one repo method")
-        void allExceptCurrent_noToken_exactlyOneRepoMethod() {
-            handler.handle(command(null, LogoutScope.ALL_EXCEPT_CURRENT), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserId(any());
-            verifyNoMoreInteractions(sessionRepository);
+        @DisplayName("ALL_SESSIONS never calls findById — no unnecessary DB query")
+        void allSessions_neverCallsFindById() {
+            handler.handle(command(LogoutScope.ALL_SESSIONS), USER_ID);
+            verify(sessionRepository, never()).findById(any());
         }
 
         @Test
-        @DisplayName("ALL_SESSIONS calls exactly one repo method")
-        void allSessions_exactlyOneRepoMethod() {
-            handler.handle(command(RAW_TOKEN, LogoutScope.ALL_SESSIONS), USER_ID);
-
-            verify(sessionRepository).revokeAllByUserId(any());
-            verifyNoMoreInteractions(sessionRepository);
+        @DisplayName("CURRENT_SESSION_ONLY never calls evictAllSessions")
+        void currentOnly_neverEvictsAll() {
+            handler.handle(command(LogoutScope.CURRENT_SESSION_ONLY), USER_ID);
+            verify(sessionCachePort, never()).evictAllSessions(any());
         }
     }
 }

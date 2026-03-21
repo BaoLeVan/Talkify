@@ -1,5 +1,6 @@
 package com.talkify.identity.interfaces.rest;
 
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +23,7 @@ import com.talkify.identity.application.handler.OtpHandler;
 import com.talkify.identity.application.handler.RegisterUserHandler;
 import com.talkify.identity.application.handler.SessionHandler;
 import com.talkify.identity.domain.model.DeviceInfo;
+import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.interfaces.rest.dto.LogoutRequest;
 
@@ -43,11 +45,6 @@ public class AuthController {
     private final DeviceContextExtractor   deviceContextExtractor;
     private final RefreshTokenCookieHelper cookieHelper;
 
-    /**
-     * Đăng nhập.
-     * RT được gửi qua HttpOnly cookie, KHÔNG nằm trong response body.
-     * FE/Mobile nhận access_token từ body, lưu trong memory.
-     */
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginCommand command,
                                            HttpServletRequest request,
@@ -58,10 +55,6 @@ public class AuthController {
         return ApiResponse.ok("Login successful", AuthResponse.withoutToken(result));
     }
 
-    /**
-     * Đăng ký tài khoản mới.
-     * Tương tự login: RT qua cookie, access_token trong body.
-     */
     @PostMapping("/register")
     public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterUserCommand command,
                                               HttpServletRequest request,
@@ -73,7 +66,7 @@ public class AuthController {
                 AuthResponse.withoutToken(result));
     }
 
-    @PostMapping("/refresh-token")
+    @GetMapping("/refresh-token")
     public ApiResponse<AuthResponse> refreshToken(HttpServletRequest request,
                                                   HttpServletResponse response) {
         String rawToken   = cookieHelper.extractRefreshToken(request)
@@ -96,19 +89,13 @@ public class AuthController {
         return ApiResponse.ok("OTP resent successfully, please check your email", null);
     }
 
-    /**
-     * Logout — thu hồi session theo scope.
-     *
-     * Yêu cầu AT hợp lệ — userId lấy từ SecurityContext.
-     * Idempotent: luôn trả thành công, cookie luôn bị xóa bất kể RT có tồn tại hay không.
-     */
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletRequest request,
                                     HttpServletResponse response,
                                     @Valid @RequestBody LogoutRequest body) {
-        String rawToken = cookieHelper.extractRefreshToken(request).orElse(null);
-        UserId userId   = SecurityUtils.requireCurrentUserId();
-        logoutHandler.handle(new LogoutCommand(rawToken, body.scope()), userId);
+        UserId userId    = SecurityUtils.requireCurrentUserId();
+        SessionId sessionId = SecurityUtils.requireCurrentSessionId();
+        logoutHandler.handle(new LogoutCommand(sessionId, body.scope()), userId);
         cookieHelper.clearRefreshTokenCookie(response);
         return ApiResponse.ok("Logout successful", null);
     }

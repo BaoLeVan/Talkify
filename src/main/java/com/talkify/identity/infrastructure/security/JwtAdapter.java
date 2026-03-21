@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import com.talkify.config.security.JwtProperties;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.TokenClaims;
+import com.talkify.identity.application.port.TokenParseResult;
 import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
@@ -22,6 +23,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PostConstruct;
 
 @Slf4j
 @Component
@@ -30,15 +32,22 @@ public class JwtAdapter implements JwtPort{
     private final JwtProperties jwtProperties;
     private SecretKey signingKey;
 
-    private SecretKey getSigningKey() {
-        if (signingKey == null) {
-            signingKey = Keys.hmacShaKeyFor(jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+    @PostConstruct
+    void init() {
+        byte[] keyBytes = jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                "JWT secret key must be at least 32 bytes, got " + keyBytes.length);
         }
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private SecretKey getSigningKey() {
         return signingKey;
     }
 
     @Override
-    public String generateAccessToken(UserId userId, SessionId sessionId, UserRole role, UserStatus status) {
+    public String issueAccessToken(UserId userId, SessionId sessionId, UserRole role, UserStatus status) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId.value()))
@@ -53,7 +62,7 @@ public class JwtAdapter implements JwtPort{
     }
 
     @Override
-    public String generateRefreshToken(UserId userId) {
+    public String issueRefreshToken(UserId userId) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId.value()))
@@ -65,20 +74,34 @@ public class JwtAdapter implements JwtPort{
     }
 
     @Override
-    public boolean validateToken(String token) {
+    public TokenParseResult parseAccessToken(String token) {
         try {
-            parseClaims(token);
-            return true;
+            Claims payload = parseClaims(token).getPayload();
+            TokenClaims claims = new TokenClaims(
+                    payload.getSubject(),
+                    payload.get("type", String.class),
+                    payload.get("role", String.class),
+                    payload.get("status", String.class),
+                    SessionId.of(payload.get("sid", Long.class))
+            );
+            return new TokenParseResult.Valid(claims);
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return new TokenParseResult.Expired();
         } catch (Exception e) {
-            log.warn("Invalid JWT token: {}", e.getMessage());
-            return false;
+            log.warn("Invalid access token: {}", e.getMessage());
+            return new TokenParseResult.Invalid();
         }
     }
 
     @Override
-    public UserId extractUserId(String token) {
-        String subject = parseClaims(token).getPayload().getSubject();
-        return UserId.of(Long.valueOf(subject));
+    public boolean validateRefreshToken(String token) {
+        try {
+            Claims payload = parseClaims(token).getPayload();
+            return "refresh".equals(payload.get("type", String.class));
+        } catch (Exception e) {
+            log.warn("Invalid refresh token: {}", e.getMessage());
+            return false;
+        }
     }
 
     private Jws<Claims> parseClaims(String token) {
@@ -89,24 +112,12 @@ public class JwtAdapter implements JwtPort{
     }
 
     @Override
-    public TokenClaims extractAllClaims(String token) {
-        Claims payload = parseClaims(token).getPayload();
-        return new TokenClaims(
-                payload.getSubject(),
-                payload.get("type", String.class),
-                payload.get("role", String.class),
-                payload.get("status", String.class),
-                SessionId.of(payload.get("sid", Long.class))
-        );
-    }
-
-    @Override
-    public long getRefreshTokenTtl() {
+    public long refreshTokenTtl() {
         return jwtProperties.getRefreshTokenTtl();
     }
 
     @Override
-    public long getRefreshThreshold() {
+    public long refreshThreshold() {
         return jwtProperties.getRefreshThreshold();
     }
 }

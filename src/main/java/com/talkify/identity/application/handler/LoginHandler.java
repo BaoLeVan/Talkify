@@ -1,5 +1,6 @@
 package com.talkify.identity.application.handler;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,7 +55,7 @@ public class LoginHandler {
                 }
 
                 SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
-                String accessToken = jwtPort.generateAccessToken(
+                String accessToken = jwtPort.issueAccessToken(
                         user.getId(),
                         sessionResult.sessionId(),
                         user.getRole(),
@@ -90,7 +91,6 @@ public class LoginHandler {
         };
     }
 
-    /** +84912345678 → +849*****78 */
     private static String maskPhone(String phone) {
         if (phone == null || phone.length() <= 4) return phone;
         int visibleSuffix = 2;

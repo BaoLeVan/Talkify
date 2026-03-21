@@ -10,11 +10,13 @@ import java.util.Optional;
 public interface SessionRepository {
 
     UserSession save(UserSession session);
+    Optional<UserSession> findById(SessionId sessionId);
     Optional<UserSession> findByTokenHash(String tokenHash);
     List<UserSession> findAllActiveByUserId(UserId userId);
+    void revokeById(SessionId sessionId);
     void revokeByTokenHash(String tokenHash);
     void revokeByIds(UserId userId, List<SessionId> sessionIds);
     void revokeAllByUserId(UserId userId);
-    void revokeAllByUserIdExceptTokenHash(UserId userId, String tokenHash);
+    void revokeAllByUserIdExceptSessionId(UserId userId, SessionId sessionId);
     void deleteExpired();
 }

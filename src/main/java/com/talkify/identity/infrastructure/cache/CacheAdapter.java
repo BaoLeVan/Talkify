@@ -1,6 +1,7 @@
 package com.talkify.identity.infrastructure.cache;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -40,21 +41,12 @@ public class CacheAdapter implements CachePort {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
-    /**
-     * Atomic GETDEL — eliminates TOCTOU race condition in OTP verify.
-     * Redis >= 6.2 supports GETDEL natively.
-     */
     @Override
     public Optional<String> getAndDelete(String key) {
         String value = redisTemplate.opsForValue().getAndDelete(key);
         log.debug("Cache GETDEL | key={} found={}", key, value != null);
         return Optional.ofNullable(value);
     }
-
-    /**
-     * Atomic INCR + SET TTL on first creation.
-     * Used for brute-force attempt counting.
-     */
     @Override
     public long increment(String key, Duration ttl) {
         Long count = redisTemplate.opsForValue().increment(key);
@@ -97,6 +89,13 @@ public class CacheAdapter implements CachePort {
     }
 
     @Override
+    public boolean setIfAbsent(String key, String value, Duration ttl) {
+        Boolean result = redisTemplate.opsForValue().setIfAbsent(key, value, ttl);
+        log.debug("Cache SETNX | key={} acquired={}", key, result);
+        return Boolean.TRUE.equals(result);
+    }
+
+    @Override
     public void expireIfGreater(String key, Duration ttl) {
         Long currentTtl = redisTemplate.getExpire(key);
         if (currentTtl == null || currentTtl < ttl.toSeconds()) {
@@ -105,5 +104,10 @@ public class CacheAdapter implements CachePort {
         } else {
             log.debug("Cache EXPIRE SKIP | key={} currentTtl={}s >= newTtl={}s", key, currentTtl, ttl.toSeconds());
         }
+    }
+
+    @Override
+    public Map<Object, Object> hget(String hashKey) {
+        return redisTemplate.opsForHash().entries(hashKey);
     }
 }
