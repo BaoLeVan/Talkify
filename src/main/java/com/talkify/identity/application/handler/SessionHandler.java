@@ -3,6 +3,7 @@ package com.talkify.identity.application.handler;
 import java.time.Clock;
 import java.time.Duration;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import com.talkify.identity.application.port.CachePort;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.application.service.SessionService;
+import com.talkify.identity.domain.event.SessionRevokedEvent;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserSession;
@@ -32,9 +34,9 @@ public class SessionHandler {
 
     private static final Duration ROTATION_LOCK_TTL = Duration.ofSeconds(5);
 
+    private final ApplicationEventPublisher    eventPublisher;
     private final CachePort         cachePort;
     private final JwtPort           jwtPort;
-    private final SessionCachePort  sessionCachePort;
     private final SessionService    sessionService;
     private final SessionRepository sessionRepository;
     private final UserRepository    userRepository;
@@ -106,7 +108,7 @@ public class SessionHandler {
     private AuthResponse handleProactiveRotation(UserSession session, User user,
                                                  String tokenHash, DeviceInfo deviceInfo) {
         sessionRepository.revokeByTokenHash(tokenHash);
-        sessionCachePort.evictSession(session.getId(), user.getId());
+        eventPublisher.publishEvent(new SessionRevokedEvent(session.getId(), user.getId()));
 
         SessionResult sessionResult = sessionService.createSession(user.getId(), deviceInfo);
         String newAccessToken = jwtPort.issueAccessToken(

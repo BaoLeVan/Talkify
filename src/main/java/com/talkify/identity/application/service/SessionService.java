@@ -3,6 +3,7 @@ package com.talkify.identity.application.service;
 import java.time.Clock;
 import java.time.Instant;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,6 +11,7 @@ import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.SessionCachePort;
+import com.talkify.identity.domain.event.SessionCreatedEvent;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserSession;
@@ -23,8 +25,8 @@ public class SessionService {
 
     private final JwtPort            jwtPort;
     private final SessionRepository  sessionRepository;
-    private final SessionCachePort   sessionCachePort;
     private final Clock              clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SessionResult createSession(UserId userId, DeviceInfo deviceInfo) {
@@ -40,7 +42,7 @@ public class SessionService {
                 now
         );
         sessionRepository.save(session);
-        sessionCachePort.cacheSession(session.getId(), userId, expiresAt);
+        eventPublisher.publishEvent(new SessionCreatedEvent(session.getId(), userId, expiresAt));
         return new SessionResult(session.getId(), rawToken, expiresAt);
     }
 }
