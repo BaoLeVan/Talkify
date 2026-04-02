@@ -2,6 +2,7 @@ package com.talkify.identity.application.handler;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -72,7 +73,7 @@ public class SessionHandler {
             throw new AppException(ErrorCode.REFRESH_TOKEN_REUSE_DETECTED);
         }
 
-        if (session.isExpired()) {
+        if (session.isExpired(Instant.now())) {
             throw new AppException(ErrorCode.REFRESH_TOKEN_EXPIRED);
         }
 
@@ -93,7 +94,7 @@ public class SessionHandler {
 
     private AuthResponse handleReactiveRenewal(UserSession session, User user,
                                                long remainingSeconds, String rawToken) {
-        session.markUsed();
+        session.markUsed(Instant.now());
         sessionRepository.save(session);
 
         String newAccessToken = jwtPort.issueAccessToken(

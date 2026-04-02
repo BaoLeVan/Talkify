@@ -20,24 +20,14 @@ public class UserSession {
     private final Instant createdAt = Instant.now();
     private Instant revokedAt;
 
-    public boolean isExpired()             { return isExpired(Instant.now()); }
     public boolean isExpired(Instant now)  { return now.isAfter(expiresAt); }
     public boolean isRevoked()             { return revokedAt != null; }
-    public boolean isValid()               { return !isRevoked() && !isExpired(); }
     public boolean isValid(Instant now)    { return !isRevoked() && !isExpired(now); }
-
-    public void revoke() {
-        revoke(Instant.now());
-    }
 
     public void revoke(Instant now) {
         if (!isRevoked()) {
             this.revokedAt = now;
         }
-    }
-
-    public void markUsed() {
-        markUsed(Instant.now());
     }
 
     public void markUsed(Instant now) {
