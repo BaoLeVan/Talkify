@@ -5,8 +5,8 @@ import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 
 public final class SecurityUtils {
 

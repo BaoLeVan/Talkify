@@ -7,13 +7,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.common.util.Sha256Utils;
 import com.talkify.identity.application.dto.SessionResult;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.domain.event.SessionCreatedEvent;
 import com.talkify.identity.domain.model.DeviceInfo;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserSession;
 import com.talkify.identity.domain.repository.SessionRepository;
 

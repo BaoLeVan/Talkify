@@ -23,8 +23,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb+srv://warcraftkun:CmeYUkN0DJHeVBmH@cluster0-baole.6bydbes.mongodb.net/talkify_db?appName=Cluster0-BaoLe
-      # docker-compose override: SPRING_DATA_MONGODB_URI → mongodb://talkify:talkify@mongodb:27017/...
+      uri: ${SPRING_DATA_MONGODB_URI}
       auto-index-creation: false
     redis:
       host: localhost

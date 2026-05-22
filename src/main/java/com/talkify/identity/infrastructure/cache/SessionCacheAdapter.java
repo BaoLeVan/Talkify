@@ -5,10 +5,10 @@ import java.time.Instant;
 
 import org.springframework.stereotype.Component;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.identity.application.port.CachePort;
 import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -69,22 +69,28 @@ CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);
 --  sequence_counter: fallback khi Redis restart + dùng tính unread (lazy).
 -- ============================================================
 CREATE TABLE IF NOT EXISTS conversations (
-    id                   VARCHAR(36)  PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id                   BIGINT       PRIMARY KEY,              -- Snowflake ID
     type                 VARCHAR(10)  NOT NULL
                          CHECK (type IN ('DIRECT', 'GROUP')),
+    status               VARCHAR(10)  NOT NULL DEFAULT 'ACTIVE'
+                         CHECK (status IN ('ACTIVE', 'SUSPENDED')),
     title                VARCHAR(200),                           -- NULL cho DIRECT
     avatar_url           VARCHAR(500),
     created_by           BIGINT       REFERENCES users(id),
     -- Denormalized — cập nhật mỗi khi có tin nhắn mới
     last_message_id      BIGINT,                                -- Snowflake, không FK (MongoDB)
+    last_message_sender_id BIGINT   REFERENCES users(id),        -- Ai gửi tin nhắn cuối
+    last_message_type    VARCHAR(10),                            -- Loại tin nhắn cuối (TEXT/IMAGE/...)
     last_message_preview VARCHAR(200),                          -- Preview hiển thị danh sách
     last_message_at      TIMESTAMPTZ,                           -- Sort danh sách hội thoại
     -- sequence_counter: nguồn fallback của Redis seq:{convId}
     --   • Mục đích 1: unread = sequence_counter - last_read_sequence (1 write/msg)
     --   • Mục đích 2: khôi phục Redis khi restart, tránh duplicate sequence
     sequence_counter     BIGINT       NOT NULL DEFAULT 0,
+    deleted_at           TIMESTAMPTZ,
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    updated_at           TIMESTAMPTZ,
+    updated_by           BIGINT       REFERENCES users(id)
 );
 
 -- Sort danh sách hội thoại theo tin nhắn mới nhất
@@ -99,36 +105,26 @@ CREATE INDEX IF NOT EXISTS idx_conv_created_by   ON conversations(created_by);
 --  left_at NOT NULL = đã rời nhóm (soft, giữ lịch sử audit).
 --  deleted_at + deleted_from_seq = xóa hội thoại phía mình (người khác vẫn thấy).
 -- ============================================================
-CREATE TABLE IF NOT EXISTS conversation_participants (
-    conversation_id  VARCHAR(36)  NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    user_id          BIGINT       NOT NULL REFERENCES users(id)          ON DELETE CASCADE,
+-- conversation_members: join entity giữa conversations và users
+-- Dùng surrogate PK (id BIGINT) thay composite PK để JPA @OneToMany hoạt động đúng
+CREATE TABLE IF NOT EXISTS conversation_members (
+    id               BIGINT       PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    conversations_id BIGINT       NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    users_id         BIGINT       NOT NULL REFERENCES users(id)          ON DELETE CASCADE,
     role             VARCHAR(10)  NOT NULL DEFAULT 'MEMBER'
                      CHECK (role IN ('OWNER', 'ADMIN', 'MEMBER')),
-    nickname         VARCHAR(100),                              -- Biệt danh riêng trong nhóm
-    muted_until      TIMESTAMPTZ,                              -- NULL = không mute
-    -- Dùng để tính unread (lazy): unread = conv.sequence_counter - last_read_sequence
-    last_read_sequence     BIGINT     NOT NULL DEFAULT 0,
-    -- DELIVERED: thiết bị đã nhận tin (WebSocket ACK hoặc FCM)
-    -- has_delivered = last_delivered_sequence >= message.sequenceNumber
-    -- Người gửi thấy "đã gửi đến" khi last_delivered_sequence của TT cả recipient được cập nhật
-    last_delivered_sequence BIGINT     NOT NULL DEFAULT 0,
-    -- Xóa hội thoại phía mình: chỉ hiển thị messages sau deleted_from_seq
-    -- Khi có tin nhắn mới > deleted_from_seq → conversation tự hiện lại
-    deleted_at       TIMESTAMPTZ,                              -- NULL = chưa xóa
-    deleted_from_seq BIGINT       NOT NULL DEFAULT 0,
+    nickname         VARCHAR(100),
+    last_read_sequence  BIGINT    NOT NULL DEFAULT 0,
     joined_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    left_at          TIMESTAMPTZ,                              -- NULL = đang trong nhóm
-    PRIMARY KEY (conversation_id, user_id)
+    left_at          TIMESTAMPTZ,
+    updated_at       TIMESTAMPTZ,
+    CONSTRAINT uq_conversation_user UNIQUE (conversations_id, users_id)
 );
 
--- Query chính: danh sách conversations của user (dùng nhiều nhất)
--- Covering index bao gồm các cột thường dùng để tránh heap fetch
-CREATE INDEX IF NOT EXISTS idx_cp_user_active ON conversation_participants(user_id)
-    INCLUDE (conversation_id, last_read_sequence, role, deleted_at, deleted_from_seq)
+CREATE INDEX IF NOT EXISTS idx_cm_user_active ON conversation_members(users_id)
     WHERE left_at IS NULL;
 
--- Kiểm tra quyền admin, đếm thành viên
-CREATE INDEX IF NOT EXISTS idx_cp_conv_role ON conversation_participants(conversation_id, role)
+CREATE INDEX IF NOT EXISTS idx_cm_conv_role ON conversation_members(conversations_id, role)
     WHERE left_at IS NULL;
 
 -- ============================================================
@@ -137,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_cp_conv_role ON conversation_participants(convers
 --  Tách riêng để tránh NULL columns dư thừa trên DIRECT conversations.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS group_settings (
-    conversation_id      VARCHAR(36)  PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id      BIGINT       PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
     max_members          INT          NOT NULL DEFAULT 1000,
     only_admins_send     BOOLEAN      NOT NULL DEFAULT FALSE,   -- Chỉ admin gửi được
     join_approval        BOOLEAN      NOT NULL DEFAULT FALSE,   -- Phải duyệt khi tham gia
@@ -157,7 +153,7 @@ CREATE INDEX IF NOT EXISTS idx_group_invite_link ON group_settings(invite_link)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS group_invitations (
     id               BIGINT      PRIMARY KEY,                   -- Snowflake ID
-    conversation_id  VARCHAR(36) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id  BIGINT      NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     inviter_id       BIGINT      NOT NULL REFERENCES users(id),
     invitee_id       BIGINT      NOT NULL REFERENCES users(id),
     status           VARCHAR(10) NOT NULL DEFAULT 'PENDING'

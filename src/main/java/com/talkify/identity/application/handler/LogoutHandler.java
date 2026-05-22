@@ -3,9 +3,9 @@ package com.talkify.identity.application.handler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.identity.application.command.LogoutCommand;
 import com.talkify.identity.application.port.SessionCachePort;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.repository.SessionRepository;
 
 import lombok.RequiredArgsConstructor;

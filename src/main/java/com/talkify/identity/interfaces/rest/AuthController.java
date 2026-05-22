@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.security.SecurityUtils;
@@ -24,7 +25,6 @@ import com.talkify.identity.application.handler.RegisterUserHandler;
 import com.talkify.identity.application.handler.SessionHandler;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.interfaces.rest.dto.LogoutRequest;
 
 import jakarta.servlet.http.HttpServletRequest;

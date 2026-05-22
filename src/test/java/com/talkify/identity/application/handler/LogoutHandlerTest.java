@@ -22,13 +22,13 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.identity.application.command.LogoutCommand;
 import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.DevicePlatform;
 import com.talkify.identity.domain.model.LogoutScope;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserSession;
 import com.talkify.identity.domain.repository.SessionRepository;
 

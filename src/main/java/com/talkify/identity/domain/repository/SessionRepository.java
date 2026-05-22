@@ -1,7 +1,7 @@
 package com.talkify.identity.domain.repository;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserSession;
 
 import java.util.List;

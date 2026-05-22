@@ -7,10 +7,10 @@ import java.util.Optional;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.common.id.IdGenerator;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserSession;
 import com.talkify.identity.domain.repository.SessionRepository;
 import com.talkify.identity.infrastructure.persistence.entity.SessionJpaEntity;

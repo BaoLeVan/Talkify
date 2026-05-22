@@ -8,12 +8,12 @@ import javax.crypto.SecretKey;
 
 import org.springframework.stereotype.Component;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.config.security.JwtProperties;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.port.TokenClaims;
 import com.talkify.identity.application.port.TokenParseResult;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
 

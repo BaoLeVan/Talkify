@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.identity.application.command.ResendOtpCommand;
@@ -36,7 +37,6 @@ import com.talkify.identity.domain.model.OtpCacheKey;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.Password;
 import com.talkify.identity.domain.model.User;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
 import com.talkify.identity.domain.repository.UserRepository;

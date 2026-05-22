@@ -3,6 +3,8 @@ package com.talkify.identity.domain.model;
 import java.time.Instant;
 import java.util.Objects;
 
+import com.talkify.common.domain.UserId;
+
 import lombok.Builder;
 import lombok.Getter;
 

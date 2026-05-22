@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.dto.response.ApiResponse;
 import com.talkify.common.security.AuthPrincipal;
@@ -20,7 +21,6 @@ import com.talkify.identity.application.port.SessionCachePort;
 import com.talkify.identity.application.port.TokenClaims;
 import com.talkify.identity.application.port.TokenParseResult;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserStatus;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.id.IdGenerator;
@@ -23,7 +24,6 @@ import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.Password;
 import com.talkify.identity.domain.model.User;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.Username;
 import com.talkify.identity.domain.repository.UserRepository;
 

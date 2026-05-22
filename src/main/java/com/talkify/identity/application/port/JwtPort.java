@@ -2,8 +2,8 @@ package com.talkify.identity.application.port;
 
 import java.util.Optional;
 
+import com.talkify.common.domain.UserId;
 import com.talkify.identity.domain.model.SessionId;
-import com.talkify.identity.domain.model.UserId;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
 

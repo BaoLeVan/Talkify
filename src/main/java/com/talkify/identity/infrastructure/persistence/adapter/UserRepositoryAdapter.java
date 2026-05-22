@@ -1,14 +1,16 @@
 package com.talkify.identity.infrastructure.persistence.adapter;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
-import com.talkify.identity.application.dto.mapper.UserMapper;
 import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.PhoneNumber;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.Username;
 import com.talkify.identity.domain.repository.UserRepository;
 import com.talkify.identity.infrastructure.persistence.entity.UserJpaEntity;
+import com.talkify.identity.infrastructure.persistence.mapper.UserMapper;
 import com.talkify.identity.infrastructure.persistence.repository.UserJpaRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -67,5 +69,12 @@ public class UserRepositoryAdapter implements UserRepository {
         return userJpaRepository.existsByPhoneNumber(phoneNumber.value());
     }
 
+    @Override
+    public List<User> findAllByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return userJpaRepository.findAllById(ids).stream()
+                .map(userMapper::toDomain)
+                .toList();
+    }
 }
 

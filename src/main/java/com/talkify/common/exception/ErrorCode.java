@@ -55,10 +55,15 @@ public enum ErrorCode {
     MESSAGE_ALREADY_REVOKED (HttpStatus.CONFLICT,              "MESSAGE_ALREADY_REVOKED", "Message has already been revoked"),
     CANNOT_REVOKE_MESSAGE   (HttpStatus.FORBIDDEN,             "CANNOT_REVOKE_MESSAGE",   "You can only revoke your own messages"),
     REVOKE_WINDOW_EXPIRED   (HttpStatus.UNPROCESSABLE_CONTENT,  "REVOKE_WINDOW_EXPIRED",   "Revoke window has expired (15 minutes)"),
+    MESSAGE_EDIT_FORBIDDEN (HttpStatus.FORBIDDEN,             "MESSAGE_EDIT_FORBIDDEN", "You can only edit your own messages"),
+    MESSAGE_EDIT_EXPIRED (HttpStatus.UNPROCESSABLE_CONTENT,  "MESSAGE_EDIT_EXPIRED",   "Message edit window has expired (15 minutes)"),
+    MESSAGE_CONTENT_EMPTY (HttpStatus.BAD_REQUEST,           "MESSAGE_CONTENT_EMPTY",   "Message content cannot be empty"),
+    SELF_CONVERSATION   (HttpStatus.BAD_REQUEST,           "SELF_CONVERSATION",       "You cannot create a conversation with yourself"),
 
     // ── Conversation ──────────────────────────────────────────────────
     CONVERSATION_NOT_FOUND  (HttpStatus.NOT_FOUND,             "CONVERSATION_NOT_FOUND",  "Conversation not found"),
     NOT_CONVERSATION_MEMBER (HttpStatus.FORBIDDEN,             "NOT_CONVERSATION_MEMBER", "You are not a member of this conversation"),
+    CONVERSATION_SUSPENDED  (HttpStatus.FORBIDDEN,             "CONVERSATION_SUSPENDED",   "This conversation has been suspended"),
 
     // ── Group ─────────────────────────────────────────────────────────
     GROUP_NOT_FOUND         (HttpStatus.NOT_FOUND,             "GROUP_NOT_FOUND",         "Group not found"),
@@ -67,7 +72,9 @@ public enum ErrorCode {
     ALREADY_GROUP_MEMBER    (HttpStatus.CONFLICT,              "ALREADY_GROUP_MEMBER",    "User is already a member of this group"),
     INVITATION_NOT_FOUND    (HttpStatus.NOT_FOUND,             "INVITATION_NOT_FOUND",    "Invitation not found"),
     INVITATION_ALREADY_USED (HttpStatus.CONFLICT,              "INVITATION_ALREADY_USED", "Invitation has already been responded to"),
-
+    GROUP_TITLE_REQUIRED (HttpStatus.BAD_REQUEST,           "GROUP_TITLE_REQUIRED",    "Group title is required"),
+    INVALID_CONVERSATION_TYPE (HttpStatus.BAD_REQUEST,           "INVALID_CONVERSATION_TYPE", "Invalid conversation type for this operation"),
+    
     // ── Media ─────────────────────────────────────────────────────────
     FILE_NOT_FOUND          (HttpStatus.NOT_FOUND,             "FILE_NOT_FOUND",          "File not found"),
     FILE_TOO_LARGE          (HttpStatus.CONTENT_TOO_LARGE,     "FILE_TOO_LARGE",          "File size exceeds the allowed limit"),

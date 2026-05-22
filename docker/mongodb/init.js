@@ -1,15 +1,15 @@
 // ============================================================
 //  MongoDB Initialization Script
-//  Database: chat_db
+//  Database: talkify_db
 //  Chạy tự động khi container khởi động lần đầu.
 // ============================================================
 
-db = db.getSiblingDB('chat_db');
+db = db.getSiblingDB('talkify_db');
 
 db.createUser({
-    user: 'chatuser',
-    pwd: 'chatpassword_change_in_prod',
-    roles: [{ role: 'readWrite', db: 'chat_db' }]
+    user: 'talkify',
+    pwd: 'talkify',
+    roles: [{ role: 'readWrite', db: 'talkify_db' }]
 });
 
 // ============================================================
@@ -77,13 +77,13 @@ db.messages.createIndex(
 // Load theo time range — sync và tìm kiếm theo ngày
 db.messages.createIndex(
     { conversationId: 1, createdAt: -1 },
-    { name: 'idx_conv_created', background: true }
+    { name: 'idx_conv_time', background: true }
 );
 
 // Tin nhắn đã gửi của user — profile screen, media gallery
 db.messages.createIndex(
     { senderId: 1, createdAt: -1 },
-    { name: 'idx_sender_created', background: true }
+    { name: 'idx_sender_time', background: true }
 );
 
 // Cập nhật replyTo.isRevoked khi message gốc bị thu hồi
@@ -207,8 +207,8 @@ print('✓ Collection: pending_messages — 2 indexes, TTL 30d');
 // ============================================================
 print('');
 print('=== MongoDB Initialization Complete ===');
-print('Database  : chat_db');
-print('User      : chatuser (readWrite)');
+print('Database  : talkify_db');
+print('User      : talkify (readWrite)');
 print('Collections:');
 print('  - messages          (5 indexes)');
 print('  - message_deleted   (3 indexes)');

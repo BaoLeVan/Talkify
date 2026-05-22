@@ -28,6 +28,13 @@ public class ApiResponse<T> {
     @Builder.Default
     Instant timestamp = Instant.now();
 
+    public static <T> ApiResponse<T> ok() {
+        return ApiResponse.<T>builder()
+                .code(HttpStatus.OK.value())
+                .message("Success")
+                .build();
+    }
+
     public static <T> ApiResponse<T> ok(T data) {
         return ApiResponse.<T>builder()
                 .code(HttpStatus.OK.value())
