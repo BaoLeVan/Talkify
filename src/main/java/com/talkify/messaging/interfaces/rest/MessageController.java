@@ -8,8 +8,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.talkify.common.security.AuthPrincipal;
 import com.talkify.dto.response.ApiResponse;
+import com.talkify.messaging.application.command.MarkAsReadCommand;
 import com.talkify.messaging.application.command.SendMessageCommand;
 import com.talkify.messaging.application.handler.MessageHandler;
+import com.talkify.messaging.interfaces.rest.request.MarkAsReadRequest;
 import com.talkify.messaging.interfaces.rest.request.SendMessageRequest;
 import com.talkify.messaging.interfaces.rest.response.SendMessageResponse;
 
@@ -23,7 +25,7 @@ public class MessageController {
     private final MessageHandler messageHandler;
     
     @PostMapping()
-    public ApiResponse<Void> sendMessage(
+    public ApiResponse<SendMessageResponse> sendMessage(
         @Valid @RequestBody SendMessageRequest request,
         @AuthenticationPrincipal AuthPrincipal principal
     ) {

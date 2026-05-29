@@ -40,6 +40,40 @@ spring:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # --- Tunable via env vars (see kafka-tune.sh) ---
+      acks: ${KAFKA_PRODUCER_ACKS:1}                          # 0=fire-forget, 1=leader-ack, all=full-sync
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+      batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:16384}          # bytes: 16KB default, try 32768/65536
+      buffer-memory: ${KAFKA_PRODUCER_BUFFER_MEMORY:33554432} # 32 MB
+      compression-type: ${KAFKA_PRODUCER_COMPRESSION:none}    # none | gzip | snappy | lz4 | zstd
+      properties:
+        spring.json.add.type.headers: false
+        linger.ms: ${KAFKA_PRODUCER_LINGER_MS:0}              # 0=no batching, 5/10/20=micro-batch
+        max.in.flight.requests.per.connection: ${KAFKA_PRODUCER_MAX_IN_FLIGHT:5}
+        request.timeout.ms: ${KAFKA_PRODUCER_REQUEST_TIMEOUT_MS:30000}
+        delivery.timeout.ms: ${KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS:120000}
+    consumer:
+      group-id: talkify-ws-dispatcher
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: latest
+      # --- Tunable via env vars ---
+      max-poll-records: ${KAFKA_CONSUMER_MAX_POLL_RECORDS:500}
+      fetch-min-size: ${KAFKA_CONSUMER_FETCH_MIN_BYTES:1}     # bytes before broker responds
+      fetch-max-wait: ${KAFKA_CONSUMER_FETCH_MAX_WAIT_MS:500ms}
+      properties:
+        spring.json.trusted.packages: com.talkify.messaging.application.event
+        spring.json.value.default.type: com.talkify.messaging.application.event.MessageDispatchEvent
+        session.timeout.ms: ${KAFKA_CONSUMER_SESSION_TIMEOUT_MS:45000}
+        heartbeat.interval.ms: ${KAFKA_CONSUMER_HEARTBEAT_MS:3000}
+    listener:
+      concurrency: ${KAFKA_LISTENER_CONCURRENCY:6}            # threads = partitions count
+
 security:
   jwt:
     secret-key: ${JWT_SECRET_KEY}

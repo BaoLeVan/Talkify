@@ -1,8 +1,5 @@
 package com.talkify.identity.application.handler;
 
-import java.time.Duration;
-import java.time.Instant;
-
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

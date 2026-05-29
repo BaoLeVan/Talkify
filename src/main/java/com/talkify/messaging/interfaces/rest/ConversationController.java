@@ -1,8 +1,13 @@
 package com.talkify.messaging.interfaces.rest;
 
+import java.util.Map;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,10 +16,13 @@ import com.talkify.common.security.SecurityUtils;
 import com.talkify.dto.response.ApiResponse;
 import com.talkify.messaging.application.command.GetConversationsCommand;
 import com.talkify.messaging.application.command.GetMessagesCommand;
+import com.talkify.messaging.application.command.MarkAsReadCommand;
 import com.talkify.messaging.application.dto.ConversationListResult;
 import com.talkify.messaging.application.dto.MessageListResult;
 import com.talkify.messaging.application.handler.ConversationHandler;
 import com.talkify.messaging.application.handler.GetMessagesHandler;
+import com.talkify.messaging.application.handler.GetReadReceiptHandler;
+import com.talkify.messaging.application.handler.ReadReceipHandler;
 import com.talkify.messaging.domain.model.ConversationCursor;
 import com.talkify.messaging.domain.model.ConversationId;
 import com.talkify.messaging.domain.model.CursorDirection;
@@ -23,22 +31,14 @@ import com.talkify.messaging.interfaces.rest.assembler.ConversationAssembler;
 import com.talkify.messaging.interfaces.rest.assembler.MessageAssembler;
 import com.talkify.messaging.interfaces.rest.request.GetConversationsRequest;
 import com.talkify.messaging.interfaces.rest.request.GetMessagesRequest;
+import com.talkify.messaging.interfaces.rest.request.MarkAsReadRequest;
 import com.talkify.messaging.interfaces.rest.response.ConversationPageResponse;
+import com.talkify.messaging.interfaces.rest.response.GetReadReceiptsResponse;
 import com.talkify.messaging.interfaces.rest.response.MessagePageResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-/**
- * REST Controller — Conversation & Messages endpoints.
- * 
- * Responsibilities (THIN controller):
- * 1. Parse HTTP request → validate → build Command/Query
- * 2. Delegate to Application layer (use cases)
- * 3. Convert application result → REST response via Assembler
- * 
- * NO business logic here. Controller is a technical adapter.
- */
 @Validated
 @RestController
 @RequestMapping("/api/v1/conversations")
@@ -49,6 +49,8 @@ public class ConversationController {
     private final GetMessagesHandler     getMessagesHandler;
     private final ConversationAssembler  conversationAssembler;
     private final MessageAssembler       messageAssembler;
+    private final ReadReceipHandler      readReceipHandler;
+    private final GetReadReceiptHandler  getReadReceiptHandler;
 
     @GetMapping
     public ApiResponse<ConversationPageResponse> getConversations(
@@ -94,5 +96,27 @@ public class ConversationController {
         // Application layer returns domain projection; Assembler converts to REST DTO
         MessageListResult result = getMessagesHandler.getMessages(command);
         return ApiResponse.ok(messageAssembler.toPageResponse(result));
+    }
+
+    @PostMapping("/{conversationId}/read")
+    public ApiResponse<Void> markAsRead(
+        @PathVariable("conversationId") Long conversationId,
+        @RequestBody MarkAsReadRequest request
+    ) {
+        MarkAsReadCommand command = new MarkAsReadCommand(
+            conversationId,
+            SecurityUtils.requireCurrentUserId().value(),
+            request.sequenceNumber()
+        );
+        readReceipHandler.handleReadReceipt(command);
+        return ApiResponse.ok("Conversation marked as read", null);
+    }
+
+    @GetMapping("/{conversationId}/read-receipts")
+    public ApiResponse<GetReadReceiptsResponse> getReadReceipts(
+        @PathVariable("conversationId") Long conversationId
+    ) {
+        Map<Long, Long> readReceipts = getReadReceiptHandler.handle(conversationId);
+        return ApiResponse.ok("Read receipts retrieved successfully", GetReadReceiptsResponse.from(readReceipts));
     }
 }

@@ -1,7 +1,9 @@
 package com.talkify.messaging.application.handler;
 
+import java.util.List;
 import java.util.Map;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,7 +12,7 @@ import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.id.IdGenerator;
 import com.talkify.messaging.application.command.SendMessageCommand;
-import com.talkify.messaging.application.port.MessagePublisher;
+import com.talkify.messaging.application.event.MessageDispatchEvent;
 import com.talkify.messaging.domain.model.Conversation;
 import com.talkify.messaging.domain.model.ConversationId;
 import com.talkify.messaging.domain.model.Message;
@@ -22,47 +24,27 @@ import com.talkify.messaging.domain.repository.MessageRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * USE CASE: Send a message to a conversation.
- * 
- * Orchestration responsibilities (Application layer):
- * 1. Resolve or create the target conversation
- * 2. Validate authorization (sender is member, conversation not suspended)
- * 3. Generate atomic sequence number via SequenceGenerator port
- * 4. Delegate message creation to Message aggregate (domain logic)
- * 5. Persist message (MongoDB) and update conversation snapshot (PostgreSQL)
- * 6. Dispatch domain events (for eventual consistency)
- * 7. Publish message for real-time delivery (future Kafka/WebSocket)
- * 
- * Transaction boundary: PostgreSQL update is transactional.
- * MongoDB save is NOT in the same transaction (eventual consistency by design).
- * If MongoDB fails after Postgres commit → compensating action needed (future).
- */
 @Service
 @RequiredArgsConstructor
 public class MessageHandler {
 
-    private final MessageRepository      messageRepository;
-    private final ConversationRepository conversationRepository;
-    private final IdGenerator            idGenerator;
-    private final SequenceGenerator      sequenceGenerator;
-    private final DomainEventPublisher   domainEventPublisher;
-    private final MessagePublisher       messagePublisher;
+    private final MessageRepository           messageRepository;
+    private final ConversationRepository      conversationRepository;
+    private final IdGenerator                 idGenerator;
+    private final SequenceGenerator           sequenceGenerator;
+    private final DomainEventPublisher        domainEventPublisher;
+    private final ApplicationEventPublisher   applicationEventPublisher;
 
     @Transactional
     public void handleSendMessage(SendMessageCommand command) {
-        // 1. Resolve target conversation (find existing or create DIRECT)
         Conversation conversation = resolveConversation(command);
 
-        // 2. Validate domain invariants
         UserId senderId = UserId.of(command.senderId());
         conversation.assertMember(senderId);
         conversation.assertNotSuspended();
 
-        // 3. Atomic sequence allocation (Redis INCR — distributed-safe)
         long sequenceNumber = sequenceGenerator.nextSequence(conversation.getId().value());
 
-        // 4. Create message via domain factory (enforces content validation)
         Message message = Message.create(
                 idGenerator,
                 conversation.getId(),
@@ -72,11 +54,8 @@ public class MessageHandler {
                 sequenceNumber,
                 command.replyToMessageId());
 
-        // 5. Persist message to MongoDB
         messageRepository.save(message);
 
-        // 6. Update conversation snapshot (denormalized for list query performance)
-        //    Uses primitives to avoid cross-aggregate dependency
         conversation.updateLastMessage(
                 message.getId(),
                 message.getSenderId(),
@@ -86,19 +65,45 @@ public class MessageHandler {
                 message.getSequenceNumber());
         conversationRepository.update(conversation);
 
-        // 7. Dispatch domain events AFTER successful persistence
         domainEventPublisher.publishAll(message.pullDomainEvents());
         domainEventPublisher.publishAll(conversation.pullDomainEvents());
 
-        // 8. Publish for real-time delivery (fire-and-forget, non-transactional)
-        messagePublisher.publish(message);
+        applicationEventPublisher.publishEvent(buildDispatchEvent(message, conversation));
     }
 
-    /**
-     * Resolve the target conversation:
-     * - If conversationId provided → load existing
-     * - If recipientId provided → find or create DIRECT conversation
-     */
+    private MessageDispatchEvent buildDispatchEvent(Message message, Conversation conversation) {
+        List<MessageDispatchEvent.AttachmentPayload> attachments = message.getContent().attachments()
+                .stream()
+                .map(a -> new MessageDispatchEvent.AttachmentPayload(
+                        a.mimeType(), a.url(), a.fileName(), a.fileSize()))
+                .toList();
+
+        MessageDispatchEvent.ReplyPayload replyTo = message.isReply()
+                ? new MessageDispatchEvent.ReplyPayload(
+                        message.getReplyToMessageId().value().toString(),
+                        message.getContent().preview(50),
+                        message.getType().name())
+                : null;
+
+        List<Long> recipientIds = conversation.getParticipants().stream()
+                .filter(p -> p.isActive())
+                .map(p -> p.getUserId().value())
+                .toList();
+
+        return new MessageDispatchEvent(
+                conversation.getId().value().toString(),
+                conversation.getType().name(),
+                recipientIds,
+                message.getId().value().toString(),
+                message.getSequenceNumber(),
+                message.getSenderId().value(),
+                message.getType().name(),
+                message.getContent().text(),
+                attachments,
+                replyTo,
+                message.getCreatedAt().toString());
+    }
+
     private Conversation resolveConversation(SendMessageCommand command) {
         if (command.conversationId() != null) {
             Conversation conv = conversationRepository.findById(
@@ -118,3 +123,4 @@ public class MessageHandler {
                         Conversation.createDirect(idGenerator, sender, recipient)));
     }
 }
+

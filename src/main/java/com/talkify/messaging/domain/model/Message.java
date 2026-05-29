@@ -63,9 +63,6 @@ public class Message extends AggregateRoot {
         msg.revoked         = false;
         msg.createdAt       = Instant.now();
 
-        msg.registerEvent(new MessageSentEvent(
-                msg.id, conversationId, senderId, content, type, sequenceNumber, Instant.now()
-        ));
         return msg;
     }
 

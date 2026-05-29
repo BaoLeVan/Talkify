@@ -55,6 +55,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, PUBLIC_POST).permitAll()
                 .requestMatchers(HttpMethod.GET, PUBLIC_GET).permitAll()
+                .requestMatchers("/ws/**").permitAll()   // SockJS/WebSocket handshake — auth done at STOMP level
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
