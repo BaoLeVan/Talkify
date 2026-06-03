@@ -1,4 +1,4 @@
-package com.talkify.messaging.infrastructure.adapter;
+package com.talkify.messaging.infrastructure.websocket.adapter;
 
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -10,6 +10,22 @@ import com.talkify.messaging.infrastructure.kafka.KafkaConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Driven adapter: nhận MessageDispatchEvent từ Kafka → push xuống WebSocket client.
+ *
+ * Vị trí đúng trong kiến trúc:
+ *   Kafka (external)  →  [KafkaToWebsocketAdapter]  →  WebSocket client
+ *
+ * Tại sao KHÔNG cần application layer / port interface:
+ *   Adapter này là pure pipeline: consume Kafka → deliver via STOMP.
+ *   Không có business logic, không có state, không có decision-making.
+ *   Application layer không gọi adapter này — Kafka listener tự động trigger.
+ *
+ * Chuẩn bị microservice:
+ *   Khi tách WS thành dedicated gateway service, class này chuyển sang service đó.
+ *   Kafka topic vẫn là integration point — không cần thay đổi producer side.
+ *   SimpMessagingTemplate được thay bằng direct STOMP session management.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

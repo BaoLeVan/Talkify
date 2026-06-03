@@ -1,4 +1,4 @@
-package com.talkify.messaging.infrastructure.adapter;
+package com.talkify.messaging.infrastructure.websocket.adapter;
 
 import java.util.Map;
 
@@ -13,10 +13,26 @@ import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Component
+/**
+ * Driven adapter: nhận read receipt event từ Redis Pub/Sub → push xuống WebSocket client.
+ *
+ * Vị trí đúng trong kiến trúc:
+ *   Redis Pub/Sub (external)  →  [ReadReceiptWebsocketRelay]  →  WebSocket client
+ *
+ * Tại sao KHÔNG cần port interface:
+ *   Implements MessageListener (Spring Data Redis) — Spring gọi onMessage() tự động
+ *   khi Redis publish message matching pattern đã subscribe.
+ *   Không có application layer involvement.
+ *
+ * Chuẩn bị microservice:
+ *   Khi tách WS service, class này chuyển sang dedicated WS gateway.
+ *   Redis Pub/Sub vẫn là integration channel — không cần thay đổi publisher side.
+ */
 @Slf4j
+@Component
 @RequiredArgsConstructor
 public class ReadReceiptWebsocketRelay implements MessageListener {
+
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final ObjectMapper objectMapper;
 
@@ -24,22 +40,20 @@ public class ReadReceiptWebsocketRelay implements MessageListener {
     public void onMessage(Message message, byte[] pattern) {
         try {
             var msg = objectMapper.readValue(new String(message.getBody()), ReadReceiptMessage.class);
-            log.info("Received read receipt message: conversationId={}, readerId={}, sequenceNumber={}, readAt={}",
-                msg.conversationId(), msg.readerid(), msg.sequenceNumber(), msg.readAt());
+            log.debug("Relaying read receipt: conversationId={}, readerId={}, seq={}",
+                msg.conversationId(), msg.readerid(), msg.sequenceNumber());
 
-            var payload = Map.of(
-                "readerId", msg.readerid(),
+            Object payload = Map.of(
+                "readerId",       msg.readerid(),
                 "sequenceNumber", msg.sequenceNumber(),
-                "readAt", msg.readAt()
+                "readAt",         msg.readAt()
             );
-
             simpMessagingTemplate.convertAndSend(
                 "/topic/conversations/%s/read-receipts".formatted(msg.conversationId()),
                 payload
             );
         } catch (Exception e) {
-            log.error("Failed to process read receipt message: " + e.getMessage(), e);
-            return;
+            log.error("Failed to relay read receipt: {}", e.getMessage(), e);
         }
     }
 }

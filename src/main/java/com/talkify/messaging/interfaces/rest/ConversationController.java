@@ -1,7 +1,10 @@
 package com.talkify.messaging.interfaces.rest;
 
+import java.security.Principal;
 import java.util.Map;
 
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,17 +15,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.talkify.common.exception.AppException;
+import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.security.SecurityUtils;
 import com.talkify.dto.response.ApiResponse;
 import com.talkify.messaging.application.command.GetConversationsCommand;
 import com.talkify.messaging.application.command.GetMessagesCommand;
 import com.talkify.messaging.application.command.MarkAsReadCommand;
+import com.talkify.messaging.application.command.TypingCommand;
 import com.talkify.messaging.application.dto.ConversationListResult;
 import com.talkify.messaging.application.dto.MessageListResult;
 import com.talkify.messaging.application.handler.ConversationHandler;
 import com.talkify.messaging.application.handler.GetMessagesHandler;
 import com.talkify.messaging.application.handler.GetReadReceiptHandler;
 import com.talkify.messaging.application.handler.ReadReceipHandler;
+import com.talkify.messaging.application.handler.TypingHandler;
 import com.talkify.messaging.domain.model.ConversationCursor;
 import com.talkify.messaging.domain.model.ConversationId;
 import com.talkify.messaging.domain.model.CursorDirection;
@@ -51,6 +58,7 @@ public class ConversationController {
     private final MessageAssembler       messageAssembler;
     private final ReadReceipHandler      readReceipHandler;
     private final GetReadReceiptHandler  getReadReceiptHandler;
+    private final TypingHandler          typingHandler;
 
     @GetMapping
     public ApiResponse<ConversationPageResponse> getConversations(
@@ -118,5 +126,25 @@ public class ConversationController {
     ) {
         Map<Long, Long> readReceipts = getReadReceiptHandler.handle(conversationId);
         return ApiResponse.ok("Read receipts retrieved successfully", GetReadReceiptsResponse.from(readReceipts));
+    }
+
+    @MessageMapping("/conv/{conversationId}/typing")
+    public void handleTyping(
+        @DestinationVariable("conversationId") Long conversationId,
+        TypingCommand command,
+        Principal principal
+    ) {
+        if (principal == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        long userId = Long.parseLong(principal.getName());
+
+        command = new TypingCommand(
+            conversationId,
+            userId,
+            command.isTyping()
+        );
+        typingHandler.handleTypingEvent(command);
     }
 }

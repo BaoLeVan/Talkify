@@ -5,7 +5,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
-import com.talkify.messaging.infrastructure.adapter.ReadReceiptWebsocketRelay;
+import com.talkify.messaging.infrastructure.websocket.adapter.ReadReceiptWebsocketRelay;
+import com.talkify.messaging.infrastructure.websocket.adapter.TypingWebsocketRelay;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RedisConfig {
     private final ReadReceiptWebsocketRelay readReceiptWebsocketRelay;
+    private final TypingWebsocketRelay typingWebsocketRelay;
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
@@ -25,6 +27,7 @@ public class RedisConfig {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(readReceiptWebsocketRelay, new PatternTopic("channel:conv:*:read-receipts"));
+        container.addMessageListener(typingWebsocketRelay, new PatternTopic("channel:conv:*:typing"));
         return container;
     }
 }
