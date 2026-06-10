@@ -79,7 +79,19 @@ public enum ErrorCode {
     FILE_NOT_FOUND          (HttpStatus.NOT_FOUND,             "FILE_NOT_FOUND",          "File not found"),
     FILE_TOO_LARGE          (HttpStatus.CONTENT_TOO_LARGE,     "FILE_TOO_LARGE",          "File size exceeds the allowed limit"),
     UNSUPPORTED_MEDIA_TYPE  (HttpStatus.UNSUPPORTED_MEDIA_TYPE,"UNSUPPORTED_MEDIA_TYPE",  "File type is not supported"),
-    UPLOAD_FAILED           (HttpStatus.INTERNAL_SERVER_ERROR, "UPLOAD_FAILED",           "File upload failed");
+    UPLOAD_FAILED           (HttpStatus.INTERNAL_SERVER_ERROR, "UPLOAD_FAILED",           "File upload failed"),
+
+    // ── Contact ─────────────────────────────────────────────────────────
+    CONTACT_NOT_FOUND           (HttpStatus.NOT_FOUND,         "CONTACT_NOT_FOUND",             "Contact not found"),
+    CONTACT_ALREADY_EXISTS      (HttpStatus.CONFLICT,          "CONTACT_ALREADY_EXISTS",        "Contact already exists"),
+    FRIEND_REQUEST_ALREADY_SENT (HttpStatus.CONFLICT,          "FRIEND_REQUEST_ALREADY_SENT",   "Friend request already sent"),
+    FRIEND_REQUEST_NOT_FOUND    (HttpStatus.NOT_FOUND,         "FRIEND_REQUEST_NOT_FOUND",      "Friend request not found"),
+    CONTACT_SELF_REQUEST        (HttpStatus.BAD_REQUEST,       "CONTACT_SELF_REQUEST",          "Cannot send a contact request to yourself"),
+    CONTACT_REQUEST_NOT_PENDING (HttpStatus.BAD_REQUEST,       "CONTACT_REQUEST_NOT_PENDING",   "Contact request is not in PENDING status"),
+    CONTACT_ACTION_FORBIDDEN    (HttpStatus.FORBIDDEN,         "CONTACT_ACTION_FORBIDDEN",      "You do not have permission to perform this action on the contact request"),
+
+    // ── Identity domain ──────────────────────────────────────────────────
+    ACCOUNT_NOT_ACTIVATABLE     (HttpStatus.BAD_REQUEST,       "ACCOUNT_NOT_ACTIVATABLE",       "Account cannot be activated in its current status");
 
     HttpStatus status;
     String code;

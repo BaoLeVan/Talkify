@@ -14,7 +14,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableJpaRepositories(
     basePackages = {
         "com.talkify.identity.infrastructure.persistence.repository",
-        "com.talkify.messaging.infrastructure.persistence.repository"
+        "com.talkify.messaging.infrastructure.persistence.repository",
+        "com.talkify.contact.infrastructure.persistence.repository"
     }
 )
 public class TalkifyApplication {

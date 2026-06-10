@@ -2,7 +2,7 @@ package com.talkify.messaging.domain.port;
 
 import java.util.List;
 
-import com.talkify.messaging.domain.event.DomainEvent;
+import com.talkify.common.domain.DomainEvent;
 
 /**
  * Outbound port — Domain layer defines the contract for event publishing.

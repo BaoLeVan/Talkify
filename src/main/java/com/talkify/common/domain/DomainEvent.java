@@ -1,4 +1,4 @@
-package com.talkify.messaging.domain.event;
+package com.talkify.common.domain;
 
 import java.time.Instant;
 

@@ -2,6 +2,7 @@ package com.talkify.messaging.domain.event;
 
 import java.time.Instant;
 
+import com.talkify.common.domain.DomainEvent;
 import com.talkify.messaging.domain.model.ConversationId;
 
 public record ConversationChangedTitleEvent(

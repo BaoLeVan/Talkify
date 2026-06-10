@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 
 import com.talkify.common.domain.UserId;
+import com.talkify.identity.domain.exception.AccountActivationException;
 
 import lombok.Getter;
 
@@ -73,9 +74,7 @@ public class User {
      */
     public void activate() {
         if (this.status != UserStatus.INACTIVE) {
-            throw new IllegalStateException(
-                "Only INACTIVE accounts can be activated, current status: " + this.status
-            );
+            throw new AccountActivationException(this.status);
         }
         this.status = UserStatus.ACTIVE;
     }

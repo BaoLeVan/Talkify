@@ -88,6 +88,32 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    /**
+     * Safety-net for IllegalArgumentException thrown by value objects (Email, Username, etc.)
+     * and other input validation that escapes the domain exception hierarchy.
+     * Logs as WARN (no stacktrace) — these are expected user input errors, not system faults.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
+        log.warn("[IllegalArgumentException] message={}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ErrorCode.INVALID_REQUEST, ex.getMessage()));
+    }
+
+    /**
+     * Safety-net for IllegalStateException thrown by domain aggregates
+     * that have not yet been migrated to named domain exceptions.
+     * Logs as WARN (no stacktrace) — these represent business rule violations.
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException ex) {
+        log.warn("[IllegalStateException] message={}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(ApiResponse.error(ErrorCode.INVALID_REQUEST, ex.getMessage()));
+    }
+
     // @ExceptionHandler(AccessDeniedException.class)
     // public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
     //     log.warn("[AccessDeniedException] message={}", ex.getMessage());

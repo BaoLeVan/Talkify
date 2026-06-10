@@ -3,7 +3,7 @@ package com.talkify.messaging.infrastructure.event;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-import com.talkify.messaging.domain.event.DomainEvent;
+import com.talkify.common.domain.DomainEvent;
 import com.talkify.messaging.domain.port.DomainEventPublisher;
 
 import lombok.RequiredArgsConstructor;
