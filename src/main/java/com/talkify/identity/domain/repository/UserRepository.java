@@ -4,10 +4,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-import com.talkify.identity.domain.model.Email;
-import com.talkify.identity.domain.model.PhoneNumber;
+import com.talkify.common.domain.Email;
+import com.talkify.common.domain.PhoneNumber;
+import com.talkify.common.domain.Username;
 import com.talkify.identity.domain.model.User;
-import com.talkify.identity.domain.model.Username;
 
 public interface UserRepository {
     User save(User user);

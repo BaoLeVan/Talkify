@@ -5,6 +5,9 @@ import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.talkify.common.domain.Email;
+import com.talkify.common.domain.PhoneNumber;
+import com.talkify.common.domain.Username;
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.identity.application.command.LoginCommand;
@@ -15,13 +18,10 @@ import com.talkify.identity.application.dto.response.AuthResponse.UserInfo;
 import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.DeviceInfo;
-import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.Identifier;
 import com.talkify.identity.domain.model.OtpPurpose;
-import com.talkify.identity.domain.model.PhoneNumber;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserStatus;
-import com.talkify.identity.domain.model.Username;
 import com.talkify.identity.domain.repository.UserRepository;
 
 import jakarta.transaction.Transactional;

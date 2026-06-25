@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.context.ApplicationEventPublisher;
 
+import com.talkify.common.domain.Email;
 import com.talkify.common.domain.UserId;
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
@@ -38,7 +39,6 @@ import com.talkify.identity.application.port.JwtPort;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.DeviceInfo;
 import com.talkify.identity.domain.model.DevicePlatform;
-import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.Password;
 import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.model.User;

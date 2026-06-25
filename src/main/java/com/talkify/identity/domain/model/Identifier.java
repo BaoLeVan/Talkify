@@ -1,5 +1,9 @@
 package com.talkify.identity.domain.model;
 
+import com.talkify.common.domain.Email;
+import com.talkify.common.domain.PhoneNumber;
+import com.talkify.common.domain.Username;
+
 public record Identifier(String value, IdentifierType type) {
     public Identifier {
         if (value == null || value.trim().isEmpty()) {

@@ -1,4 +1,4 @@
-package com.talkify.identity.domain.model;
+package com.talkify.common.domain;
 
 public record Username(String value) {
     public Username {

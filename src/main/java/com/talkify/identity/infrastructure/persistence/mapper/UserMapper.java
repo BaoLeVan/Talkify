@@ -2,8 +2,8 @@ package com.talkify.identity.infrastructure.persistence.mapper;
 
 import org.springframework.stereotype.Component;
 
+import com.talkify.common.domain.Email;
 import com.talkify.common.domain.UserId;
-import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.Password;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserRole;

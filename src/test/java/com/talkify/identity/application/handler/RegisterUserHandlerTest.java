@@ -23,6 +23,8 @@ import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.talkify.common.domain.Email;
+import com.talkify.common.domain.Username;
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;
 import com.talkify.common.id.IdGenerator;
@@ -35,12 +37,10 @@ import com.talkify.identity.domain.model.DevicePlatform;
 import com.talkify.identity.application.service.SessionService;
 import com.talkify.identity.domain.model.SessionId;
 import com.talkify.identity.domain.event.UserRegisteredEvent;
-import com.talkify.identity.domain.model.Email;
 import com.talkify.identity.domain.model.OtpPurpose;
 import com.talkify.identity.domain.model.User;
 import com.talkify.identity.domain.model.UserRole;
 import com.talkify.identity.domain.model.UserStatus;
-import com.talkify.identity.domain.model.Username;
 import com.talkify.identity.domain.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)

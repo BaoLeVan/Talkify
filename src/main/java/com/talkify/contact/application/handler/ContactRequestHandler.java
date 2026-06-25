@@ -12,7 +12,6 @@ import com.talkify.contact.application.command.SentContactRequestCommand;
 import com.talkify.contact.domain.model.Contact;
 import com.talkify.contact.domain.model.ContactStatus;
 import com.talkify.contact.domain.repository.ContactRepository;
-import com.talkify.contact.infrastructure.persistence.mapper.ContactMapper;
 import com.talkify.dto.response.ApiResponse;
 
 import lombok.RequiredArgsConstructor;

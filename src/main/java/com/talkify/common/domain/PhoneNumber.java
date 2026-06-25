@@ -1,4 +1,4 @@
-package com.talkify.identity.domain.model;
+package com.talkify.common.domain;
 
 import com.talkify.common.exception.AppException;
 import com.talkify.common.exception.ErrorCode;

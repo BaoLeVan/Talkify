@@ -5,7 +5,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.talkify.common.domain.Email;
 import com.talkify.common.domain.UserId;
+import com.talkify.common.domain.Username;
 import com.talkify.identity.domain.exception.AccountActivationException;
 
 import lombok.Getter;
